@@ -18,7 +18,7 @@ namespace JstFlow.Interface
         /// <summary>
         /// 表达式期望返回的类型
         /// </summary>
-        Label<IValue> ReturnType { get; }
+        Label<IValueType> ReturnType { get; }
 
         /// <summary>
         /// 输入 定义
@@ -30,6 +30,6 @@ namespace JstFlow.Interface
         /// </summary>
         /// <param name="inputs">输入的变量值，例如来自节点上下文</param>
         /// <returns>表达式计算结果</returns>
-        Task<Res<IDictionary<Label, IValue>>> Evaluate(IDictionary<Label, IValue> inputs);
+        Task<Res<Label<IValue>>> Evaluate(IDictionary<Label, IValue> inputs);
     }
 }

@@ -14,50 +14,18 @@ namespace JstFlow.Interface
     public interface INode
     {
 
-        /// <summary>
-        /// 节点名称
-        /// </summary>
-        string NodeName { get; }
+    // 节点基础信息
+    string NodeName { get; }
+    string NodeCode { get; }
+    IDictionary<Label, IParameter> Inputs { get; }
+    IDictionary<Label, IValueType> Outputs { get; }
+    IList<Label> OutputActions { get; }
+    IList<Label> InputActions { get; }
 
-        string NodeCode { get; }
-
-
-
-        
-        /// <summary>
-        /// 输入 定义
-        /// </summary>
-        IDictionary<Label, IParameter> Inputs { get; }
-
-        /// <summary>
-        /// 输出 定义
-        /// </summary>
-        IDictionary<Label, IValueType> Outputs { get; }
-
-        
-        /// <summary>
-        /// 输出动作
-        /// </summary>
-        IList<Label> OutputActions { get; }
-
-        /// <summary>
-        /// 校验参数是否合法
-        /// </summary>
-        /// <param name="inputs"></param>
-        /// <returns></returns>
-        Res IsValid(IDictionary<Label, IValue> inputs);
-
-
-
-
-        /// <summary>
-        /// 执行
-        /// </summary>
-        Task<Res<NodeExecuteResult>> Execute(IDictionary<Label, IValue> inputs);
-
-
-
-
+    event Func<string, Task> OnNodeEvent;
+    event Action OnCompleted;
+    // 启动节点
+    Task StartAsync(IDictionary<Label, IValue> inputs);
 
     }
 }
