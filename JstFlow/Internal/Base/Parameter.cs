@@ -8,13 +8,13 @@ namespace JstFlow.Internal.Base
     public class Parameter : IParameter
     {
 
-        public Parameter(IValue valueType, bool required)
+        public Parameter(IValueType valueType, bool required)
         {
             ValueType = valueType;
             Required = required;
         }
 
-        public IValue ValueType { get; set; }
+        public IValueType ValueType { get; set; }
 
         public bool Required { get; set; }
     }

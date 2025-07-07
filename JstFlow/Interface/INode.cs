@@ -32,7 +32,7 @@ namespace JstFlow.Interface
         /// <summary>
         /// 输出 定义
         /// </summary>
-        IDictionary<Label, IValue> Outputs { get; }
+        IDictionary<Label, IValueType> Outputs { get; }
 
         
         /// <summary>

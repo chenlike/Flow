@@ -10,7 +10,8 @@ namespace JstFlow.Interface
         /// <summary>
         /// 参数类型
         /// </summary>
-        IValue ValueType { get; }
+        IValueType ValueType { get; }
+        
 
         /// <summary>
         /// 是否必填

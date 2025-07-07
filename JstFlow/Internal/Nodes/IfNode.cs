@@ -18,13 +18,13 @@ namespace JstFlow.Internal.Nodes
 
         public IDictionary<Label, IParameter> Inputs => new Dictionary<Label, IParameter>()
         {
-            { new Label("condition","条件A"), new Parameter(null, true) },
-            { new Label("condition","条件B"), new Parameter(null, true) },
+            { new Label("conditionA","条件A"), new Parameter(AnyType.Instance, true) },
+            { new Label("conditionB","条件B"), new Parameter(AnyType.Instance, true) },
         };
 
-        public IDictionary<Label, IValue> Outputs => new Dictionary<Label, IValue>()
+        public IDictionary<Label, IValueType> Outputs => new Dictionary<Label, IValueType>()
         {
-            { new Label("result","结果"), new BoolValueType(false) }
+            { new Label("result","结果"), BoolType.Instance }
         };
 
         public IList<Label> OutputActions => new List<Label>()
@@ -42,7 +42,7 @@ namespace JstFlow.Internal.Nodes
                 return Task.FromResult(Res<NodeExecuteResult>.Ok(new NodeExecuteResult(){
                     Outputs = new Dictionary<Label, IValue>()
                     {
-                        { new Label("result","结果"), new BoolValueType(true) }
+                        { new Label("result","结果"), new BoolValue(true) }
                     },
                     ActionToExecute = new Label("true","真")
                 }));
@@ -50,7 +50,7 @@ namespace JstFlow.Internal.Nodes
                 return Task.FromResult(Res<NodeExecuteResult>.Ok(new NodeExecuteResult(){
                     Outputs = new Dictionary<Label, IValue>()
                     {
-                        { new Label("result","结果"), new BoolValueType(false) }
+                        { new Label("result","结果"), new BoolValue(false) }
                     },
                     ActionToExecute = new Label("false","假")
                 }));
@@ -68,7 +68,7 @@ namespace JstFlow.Internal.Nodes
             var conditionB = inputs["conditionB"];
 
             // 判断类型是否一致  根据Type
-            if (conditionA.GetType() != conditionB.GetType())
+            if (conditionA.ValueType != conditionB.ValueType)
             {
                 return Res.Fail("输入参数类型不一致");
             }
