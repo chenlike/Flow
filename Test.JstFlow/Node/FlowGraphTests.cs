@@ -2,6 +2,7 @@ using JstFlow.Internal;
 using JstFlow.Internal.NodeMeta;
 using JstFlow.Internal.Metas;
 using JstFlow.Common;
+using JstFlow.External;
 using System;
 using System.Linq;
 using Xunit;
@@ -150,6 +151,101 @@ namespace Test.JstFlow.Node
             Assert.Equal(node3.Id, sortedNodes[2].Id);
         }
 
+
+        [Fact]
+        public void TestFlowGraph_StartNode_Validation()
+        {
+            // 创建图
+            var graph = new FlowGraph();
+
+            // 验证空图不包含StartNode
+            Assert.False(graph.HasStartNode());
+            Assert.Null(graph.GetStartNode());
+
+            // 验证空图的验证结果
+            var validationResult = graph.ValidateGraph();
+            Assert.False(validationResult.IsValid);
+            Assert.Contains("流程图必须包含一个StartNode作为起始点", validationResult.Errors);
+
+            // 创建StartNode
+            var startNode = CreateStartNode();
+
+            // 添加StartNode
+            graph.AddNode(startNode);
+
+            // 验证现在包含StartNode
+            Assert.True(graph.HasStartNode());
+            Assert.NotNull(graph.GetStartNode());
+            Assert.Equal(startNode.Id, graph.GetStartNode().Id);
+
+            // 验证图的验证结果
+            validationResult = graph.ValidateGraph();
+            Assert.True(validationResult.IsValid);
+        }
+
+        [Fact]
+        public void TestFlowGraph_StartNode_Removal_NotAllowed()
+        {
+            // 创建图
+            var graph = new FlowGraph();
+
+            // 创建并添加StartNode
+            var startNode = CreateStartNode();
+            graph.AddNode(startNode);
+
+            // 验证不能移除StartNode
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                graph.RemoveNode(startNode.Id));
+
+            Assert.Contains("不能移除StartNode", exception.Message);
+        }
+
+        [Fact]
+        public void TestFlowGraph_StartNode_WithOtherNodes()
+        {
+            // 创建图
+            var graph = new FlowGraph();
+
+            // 创建StartNode和其他节点
+            var startNode = CreateStartNode();
+            var node1 = CreateTestNode("Node1", Guid.NewGuid());
+            var node2 = CreateTestNode("Node2", Guid.NewGuid());
+
+            // 添加所有节点
+            graph.AddNode(startNode);
+            graph.AddNode(node1);
+            graph.AddNode(node2);
+
+            // 验证StartNode检测
+            Assert.True(graph.HasStartNode());
+            Assert.Equal(startNode.Id, graph.GetStartNode().Id);
+
+            // 验证图验证通过
+            var validationResult = graph.ValidateGraph();
+            Assert.True(validationResult.IsValid);
+        }
+
+        private FlowNode CreateStartNode()
+        {
+            return new FlowNode
+            {
+                Id = Guid.NewGuid(),
+                Label = new Label("开始", "开始"),
+                Kind = NodeKind.Node,
+                NodeImplType = typeof(StartNode),
+                InputFields = new List<InputField>(),
+                OutputFields = new List<OutputField>(),
+                Signals = new List<SignalInfo>(),
+                Emits = new List<EmitInfo>
+                {
+                    new EmitInfo
+                    {
+                        Label = new Label("开始执行", "开始执行"),
+                        EventInfo = typeof(StartNode).GetEvent("Start")
+                    }
+                }
+            };
+        }
 
         private FlowNode CreateTestNode(string name, Guid id)
         {

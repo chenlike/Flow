@@ -29,7 +29,7 @@ namespace JstFlow.Internal
             {
                 nodeInfo.Kind = NodeKind.Expression;
                 // 获取表达式名称
-                var flowExpressionAttr = nodeType.GetCustomAttribute<FlowExpressionAttribute>();
+                var flowExpressionAttr = nodeType.GetCustomAttribute<FlowExprAttribute>();
                 if (flowExpressionAttr != null && !string.IsNullOrEmpty(flowExpressionAttr.Label))
                 {
                     nodeInfo.Label = new Label(nodeType.Name, flowExpressionAttr.Label);
@@ -151,11 +151,11 @@ namespace JstFlow.Internal
         {
             if (type == null) return false;
             
-            // 检查基类型是否为FlowExpression
+            // 检查基类型是否为FlowExpression<T>
             var baseType = type.BaseType;
             while (baseType != null)
             {
-                if (baseType == typeof(FlowExpression))
+                if (baseType.IsGenericType && baseType.GetGenericTypeDefinition() == typeof(FlowExpression<>))
                 {
                     return true;
                 }
@@ -171,7 +171,7 @@ namespace JstFlow.Internal
         private static string GetExpressionLabel(Type type)
         {
             // 尝试获取FlowExpressionAttribute
-            var flowExpressionAttr = type.GetCustomAttribute<FlowExpressionAttribute>();
+            var flowExpressionAttr = type.GetCustomAttribute<FlowExprAttribute>();
             if (flowExpressionAttr != null && !string.IsNullOrEmpty(flowExpressionAttr.Label))
             {
                 return flowExpressionAttr.Label;

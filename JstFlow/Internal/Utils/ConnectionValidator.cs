@@ -6,6 +6,23 @@ using System.Linq;
 namespace JstFlow.Internal.Utils
 {
     /// <summary>
+    /// 通用验证结果
+    /// </summary>
+    public class ValidationResult
+    {
+        public bool IsValid => !Errors.Any();
+        public List<string> Errors { get; } = new List<string>();
+        public void AddError(string error)
+        {
+            Errors.Add(error);
+        }
+        public string GetErrorMessage()
+        {
+            return string.Join("; ", Errors);
+        }
+    }
+
+    /// <summary>
     /// 连接验证器，负责验证连接的有效性
     /// </summary>
     public class ConnectionValidator
@@ -338,25 +355,6 @@ namespace JstFlow.Internal.Utils
             }
 
             BuildFieldIndexes(nodes);
-        }
-    }
-
-    /// <summary>
-    /// 验证结果
-    /// </summary>
-    public class ValidationResult
-    {
-        public bool IsValid => !Errors.Any();
-        public List<string> Errors { get; } = new List<string>();
-
-        public void AddError(string error)
-        {
-            Errors.Add(error);
-        }
-
-        public string GetErrorMessage()
-        {
-            return string.Join("; ", Errors);
         }
     }
 }

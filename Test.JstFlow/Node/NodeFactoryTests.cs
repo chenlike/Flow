@@ -82,8 +82,8 @@ namespace Test.JstFlow.Node
             public event Action NormalEvent;
         }
 
-        [FlowExpression("数学表达式")]
-        public class MathExpression : FlowExpression
+        [FlowExpr("数学表达式")]
+        public class MathExpression : FlowExpression<int>
         {
             [Input("左操作数")]
             public int Left { get; set; }
@@ -94,13 +94,14 @@ namespace Test.JstFlow.Node
             [Output("计算结果")]
             public int Result { get; set; }
 
-            public override void Evaluate()
+            public override int Evaluate()
             {
                 Result = Left + Right;
+                return Result;
             }
         }
 
-        public class StringExpression : FlowExpression
+        public class StringExpression : FlowExpression<string>
         {
             [Input("前缀")]
             public string Prefix { get; set; }
@@ -111,14 +112,15 @@ namespace Test.JstFlow.Node
             [Output("连接结果")]
             public string Result { get; set; }
 
-            public override void Evaluate()
+            public override string Evaluate()
             {
                 Result = $"{Prefix}{Suffix}";
+                return Result;
             }
         }
 
-        [FlowExpression("泛型比较表达式")]
-        public class GenericEqualExpression<TInput> : FlowExpression where TInput : IEquatable<TInput>
+        [FlowExpr("泛型比较表达式")]
+        public class GenericEqualExpression<TInput> : FlowExpression<bool> where TInput : IEquatable<TInput>
         {
             [Input("左值")]
             public TInput Left { get; set; }
@@ -129,9 +131,10 @@ namespace Test.JstFlow.Node
             [Output("是否相等")]
             public bool Result { get; set; }
 
-            public override void Evaluate()
+            public override bool Evaluate()
             {
                 Result = Left.Equals(Right);
+                return Result;
             }
         }
 

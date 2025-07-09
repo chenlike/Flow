@@ -5,9 +5,9 @@ using JstFlow.Attributes;
 
 namespace JstFlow.Internal.Metas
 {
-    public abstract class FlowExpression
+    public abstract class FlowExpression<TResult>
     {
         [Signal("执行")]
-        public abstract void Evaluate();
+        public abstract TResult Evaluate();
     }
 }
