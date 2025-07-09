@@ -6,26 +6,45 @@ using System.Linq;
 using JstFlow.Internal.NodeMeta;
 using JstFlow.Attributes;
 using JstFlow.Common;
+using JstFlow.Internal.Metas;
 
 namespace JstFlow.Internal
 {
     public class NodeFactory
     {
-        public static NodeInfo CreateNodeInfo(Type nodeType)
+        public static FlowNodeMeta CreateNodeInfo(Type nodeType)
         {
-            var nodeInfo = new NodeInfo
+            var nodeInfo = new FlowNodeMeta
             {
                 InputFields = new List<InputField>(),
                 OutputFields = new List<OutputField>(),
                 Signals = new List<SignalInfo>(),
                 Emits = new List<EmitInfo>(),
-                NodeType = nodeType,
-
+                NodeImplType = nodeType,
             };
 
-            // 获取节点名称
-            var flowNodeAttr = nodeType.GetCustomAttribute<FlowNodeAttribute>();
-            nodeInfo.Name = new Label(nodeType.Name, flowNodeAttr?.Label ?? nodeType.Name);
+            // 判断节点类型
+            if (IsFlowExpression(nodeType))
+            {
+                nodeInfo.Kind = NodeKind.Expression;
+                // 获取表达式名称
+                var flowExpressionAttr = nodeType.GetCustomAttribute<FlowExpressionAttribute>();
+                if (flowExpressionAttr != null && !string.IsNullOrEmpty(flowExpressionAttr.Label))
+                {
+                    nodeInfo.Name = new Label(nodeType.Name, flowExpressionAttr.Label);
+                }
+                else
+                {
+                    nodeInfo.Name = new Label(nodeType.Name, nodeType.Name);
+                }
+            }
+            else
+            {
+                nodeInfo.Kind = NodeKind.Node;
+                // 获取节点名称
+                var flowNodeAttr = nodeType.GetCustomAttribute<FlowNodeAttribute>();
+                nodeInfo.Name = new Label(nodeType.Name, flowNodeAttr?.Label ?? nodeType.Name);
+            }
 
             // 获取所有属性
             var properties = nodeType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
@@ -92,6 +111,43 @@ namespace JstFlow.Internal
             }
 
             return nodeInfo;
+        }
+
+        /// <summary>
+        /// 判断是否为FlowExpression类型
+        /// </summary>
+        private static bool IsFlowExpression(Type type)
+        {
+            if (type == null) return false;
+            
+            // 检查基类型是否为FlowExpression
+            var baseType = type.BaseType;
+            while (baseType != null)
+            {
+                if (baseType == typeof(FlowExpression))
+                {
+                    return true;
+                }
+                baseType = baseType.BaseType;
+            }
+            
+            return false;
+        }
+
+        /// <summary>
+        /// 获取表达式标签
+        /// </summary>
+        private static string GetExpressionLabel(Type type)
+        {
+            // 尝试获取FlowExpressionAttribute
+            var flowExpressionAttr = type.GetCustomAttribute<FlowExpressionAttribute>();
+            if (flowExpressionAttr != null && !string.IsNullOrEmpty(flowExpressionAttr.Label))
+            {
+                return flowExpressionAttr.Label;
+            }
+            
+            // 如果没有属性或标签为空，返回类型名称
+            return type.Name;
         }
     }
 }

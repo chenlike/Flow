@@ -1,4 +1,5 @@
 ﻿using JstFlow.Attributes;
+using JstFlow.Internal.Metas;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -32,5 +33,23 @@ namespace JstFlow
 
 
 
+    }
+
+
+    public class EqualExpression<TInput> : FlowExpression where TInput : IEquatable<TInput>
+    {
+        [Input("左值")]
+        public TInput Left { get; set; }
+
+        [Input("右值")]
+        public TInput Right { get; set; }
+
+        [Output("是否相等")]
+        public bool Result { get; set; }
+
+        public override void Evaluate()
+        {
+            Result = Left.Equals(Right);
+        }
     }
 }

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace Test.JstFlow
 {
-    public class BaseValueTypeTests
+    public class SimpleTests
     {
         [Fact]
         public void TestValueTypeSingleton()

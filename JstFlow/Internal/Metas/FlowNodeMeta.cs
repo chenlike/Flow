@@ -2,15 +2,21 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using JstFlow.Internal.Metas;
 
 namespace JstFlow.Internal.NodeMeta
 {
-    public class NodeInfo
+    public class FlowNodeMeta
     {
 
         public Label Name { get; set; }
 
-        public Type NodeType { get; set; }
+        public Type NodeImplType { get; set; }
+
+        /// <summary>
+        /// 节点类型
+        /// </summary>
+        public NodeKind Kind { get; set; }
 
         /// <summary>
         /// 输入字段
