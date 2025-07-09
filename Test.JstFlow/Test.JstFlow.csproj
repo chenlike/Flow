@@ -23,4 +23,9 @@
     <ProjectReference Include="..\JstFlow\JstFlow.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Expressions\" />
+    <Folder Include="Nodes\" />
+  </ItemGroup>
+
 </Project>
