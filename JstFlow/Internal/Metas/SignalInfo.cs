@@ -8,7 +8,7 @@ namespace JstFlow.Internal.NodeMeta
 {
     public class SignalInfo
     {
-        public Label Name { get; set; }
+        public Label Label { get; set; }
         public MethodInfo MethodInfo { get; set; }
 
 

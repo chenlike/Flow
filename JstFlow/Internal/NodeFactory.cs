@@ -12,10 +12,11 @@ namespace JstFlow.Internal
 {
     public class NodeFactory
     {
-        public static FlowNodeMeta CreateNodeInfo(Type nodeType)
+        public static FlowNode CreateNodeInfo(Type nodeType)
         {
-            var nodeInfo = new FlowNodeMeta
+            var nodeInfo = new FlowNode
             {
+                Id = Guid.NewGuid(),
                 InputFields = new List<InputField>(),
                 OutputFields = new List<OutputField>(),
                 Signals = new List<SignalInfo>(),
@@ -31,11 +32,11 @@ namespace JstFlow.Internal
                 var flowExpressionAttr = nodeType.GetCustomAttribute<FlowExpressionAttribute>();
                 if (flowExpressionAttr != null && !string.IsNullOrEmpty(flowExpressionAttr.Label))
                 {
-                    nodeInfo.Name = new Label(nodeType.Name, flowExpressionAttr.Label);
+                    nodeInfo.Label = new Label(nodeType.Name, flowExpressionAttr.Label);
                 }
                 else
                 {
-                    nodeInfo.Name = new Label(nodeType.Name, nodeType.Name);
+                    nodeInfo.Label = new Label(nodeType.Name, nodeType.Name);
                 }
             }
             else
@@ -43,7 +44,7 @@ namespace JstFlow.Internal
                 nodeInfo.Kind = NodeKind.Node;
                 // 获取节点名称
                 var flowNodeAttr = nodeType.GetCustomAttribute<FlowNodeAttribute>();
-                nodeInfo.Name = new Label(nodeType.Name, flowNodeAttr?.Label ?? nodeType.Name);
+                nodeInfo.Label = new Label(nodeType.Name, flowNodeAttr?.Label ?? nodeType.Name);
             }
 
             // 获取所有属性
@@ -57,11 +58,26 @@ namespace JstFlow.Internal
                 {
                     var inputField = new InputField
                     {
-                        Name = new Label(prop.Name, inputAttr.Label),
+                        Label = new Label(prop.Name, inputAttr.Label),
                         Type = prop.PropertyType.Name,
                         Required = inputAttr.Required,
                         PropertyInfo = prop
                     };
+
+                    // 检查是否为泛型参数
+                    if (prop.PropertyType.IsGenericParameter)
+                    {
+                        inputField.IsGenericParameter = true;
+                        inputField.GenericParameterName = prop.PropertyType.Name;
+                        
+                        // 获取泛型约束
+                        var constraints = prop.PropertyType.GetGenericParameterConstraints();
+                        foreach (var constraint in constraints)
+                        {
+                            inputField.GenericConstraints.Add(constraint.Name);
+                        }
+                    }
+
                     nodeInfo.InputFields.Add(inputField);
                 }
 
@@ -70,10 +86,25 @@ namespace JstFlow.Internal
                 {
                     var outputField = new OutputField
                     {
-                        Name = new Label(prop.Name, outputAttr.Label),
+                        Label = new Label(prop.Name, outputAttr.Label),
                         Type = prop.PropertyType.Name,
                         PropertyInfo = prop
                     };
+
+                    // 检查是否为泛型参数
+                    if (prop.PropertyType.IsGenericParameter)
+                    {
+                        outputField.IsGenericParameter = true;
+                        outputField.GenericParameterName = prop.PropertyType.Name;
+                        
+                        // 获取泛型约束
+                        var constraints = prop.PropertyType.GetGenericParameterConstraints();
+                        foreach (var constraint in constraints)
+                        {
+                            outputField.GenericConstraints.Add(constraint.Name);
+                        }
+                    }
+
                     nodeInfo.OutputFields.Add(outputField);
                 }
             }
@@ -87,7 +118,7 @@ namespace JstFlow.Internal
                 {
                     var signalInfo = new SignalInfo
                     {
-                        Name = new Label(method.Name, signalAttr.Label),
+                        Label = new Label(method.Name, signalAttr.Label),
                         MethodInfo = method
                     };
                     nodeInfo.Signals.Add(signalInfo);
@@ -103,7 +134,7 @@ namespace JstFlow.Internal
                 {
                     var emitInfo = new EmitInfo
                     {
-                        Name = new Label(evt.Name, emitAttr.Label),
+                        Label = new Label(evt.Name, emitAttr.Label),
                         EventInfo = evt
                     };
                     nodeInfo.Emits.Add(emitInfo);

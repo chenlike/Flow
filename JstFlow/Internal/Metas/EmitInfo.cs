@@ -8,7 +8,7 @@ namespace JstFlow.Internal.NodeMeta
 {
     public class EmitInfo
     {
-        public Label Name { get; set; }
+        public Label Label { get; set; }
         public EventInfo EventInfo { get; set; }
     }
 }

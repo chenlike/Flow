@@ -6,11 +6,26 @@ using JstFlow.Internal.Metas;
 
 namespace JstFlow.Internal.NodeMeta
 {
-    public class FlowNodeMeta
+    public class FlowNode
     {
+        public FlowNode()
+        {
+            Id = Guid.NewGuid();
+        }
 
-        public Label Name { get; set; }
+        /// <summary>
+        /// 节点的唯一标识
+        /// </summary>
+        public Guid Id { get; set; } 
 
+        /// <summary>
+        /// 节点名称
+        /// </summary>
+        public Label Label { get; set; }
+
+        /// <summary>
+        /// 节点实现类型
+        /// </summary>
         public Type NodeImplType { get; set; }
 
         /// <summary>
