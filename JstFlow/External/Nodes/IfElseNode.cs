@@ -12,10 +12,10 @@ namespace JstFlow.External
         [Input("条件", Required = true)]
         public bool Condition { get; set; }
 
-        [Emit("如果真，执行")]
+        [Emit("那么")]
         public event Action TrueBranch;
 
-        [Emit("如果假，执行")]
+        [Emit("否则")]
         public event Action FalseBranch;
 
         [Signal("执行")]
