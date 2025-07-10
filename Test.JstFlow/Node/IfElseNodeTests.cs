@@ -159,11 +159,11 @@ namespace Test.JstFlow.Node
             Assert.Equal(2, nodeInfo.Emits.Count);
             var trueBranchEmit = nodeInfo.Emits.Find(e => e.Label.Code == "TrueBranch");
             Assert.NotNull(trueBranchEmit);
-            Assert.Equal("如果真，执行", trueBranchEmit.Label.DisplayName);
+            Assert.Equal("那么", trueBranchEmit.Label.DisplayName);
 
             var falseBranchEmit = nodeInfo.Emits.Find(e => e.Label.Code == "FalseBranch");
             Assert.NotNull(falseBranchEmit);
-            Assert.Equal("如果假，执行", falseBranchEmit.Label.DisplayName);
+            Assert.Equal("否则", falseBranchEmit.Label.DisplayName);
         }
 
         [Fact]
