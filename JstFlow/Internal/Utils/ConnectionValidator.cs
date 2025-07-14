@@ -113,7 +113,7 @@ namespace JstFlow.Internal.Utils
                     ValidateOutputToInputConnection(connection, result);
                     break;
                 case ConnectionType.EventToSignal:
-                    ValidateEventToSignalConnection(connection, result);
+                    ValidateEventToSignalConnection(connection, existingConnections, result);
                     break;
                 default:
                     result.AddError($"不支持的连接类型: {connection.Type}");
@@ -199,7 +199,7 @@ namespace JstFlow.Internal.Utils
         /// <summary>
         /// 验证事件到信号的连接
         /// </summary>
-        private void ValidateEventToSignalConnection(FlowConnection connection, ValidationResult result)
+        private void ValidateEventToSignalConnection(FlowConnection connection, IEnumerable<FlowConnection> existingConnections, ValidationResult result)
         {
             var sourceKey = $"{connection.SourceNodeId}:{connection.SourceEndpointCode}";
             var targetKey = $"{connection.TargetNodeId}:{connection.TargetEndpointCode}";
@@ -216,6 +216,27 @@ namespace JstFlow.Internal.Utils
             {
                 result.AddError($"目标节点不存在信号: {connection.TargetEndpointCode}");
                 return;
+            }
+            
+            // 验证一个event只能连接一个signal
+            ValidateEventToOneSignal(connection, existingConnections, result);
+        }
+
+        /// <summary>
+        /// 验证一个事件只能连接一个信号
+        /// </summary>
+        private void ValidateEventToOneSignal(FlowConnection connection, IEnumerable<FlowConnection> existingConnections, ValidationResult result)
+        {
+            // 检查是否已经存在从同一个源事件出发的连接
+            var existingEventConnections = existingConnections
+                .Where(c => c.Type == ConnectionType.EventToSignal &&
+                           c.SourceNodeId == connection.SourceNodeId &&
+                           c.SourceEndpointCode == connection.SourceEndpointCode)
+                .ToList();
+
+            if (existingEventConnections.Any())
+            {
+                result.AddError($"事件 '{connection.SourceEndpointCode}' 已经连接到其他信号，一个事件只能连接一个信号");
             }
         }
 
