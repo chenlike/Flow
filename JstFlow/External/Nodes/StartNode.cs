@@ -17,6 +17,7 @@ namespace JstFlow.External
         [Signal("开始循环")]
         public void StartLoop()
         {
+            Start?.Invoke();
         }
     }
 }

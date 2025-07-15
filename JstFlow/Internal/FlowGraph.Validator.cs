@@ -10,7 +10,7 @@ namespace JstFlow.Internal
     public partial class FlowGraph
     {
 
-        private Res ValidateGraph()
+        internal Res ValidateGraph()
         {
             if (Nodes == null || Nodes.Count == 0)
             {

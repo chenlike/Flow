@@ -7,6 +7,7 @@ using JstFlow.Internal.NodeMeta;
 using JstFlow.Internal.Metas;
 using System.Threading.Tasks;
 using JstFlow.External;
+using JstFlow.Common;
 
 namespace JstFlow.Internal
 {
@@ -19,9 +20,57 @@ namespace JstFlow.Internal
         /// 要执行的流程图
         /// </summary>
         private FlowGraph _flowGraph;
+ 
+
+        private Dictionary<long, FlowNode> _nodeMap;
 
 
 
+        public long CurrentNodeId { get; private set; }
+
+
+
+        
+ 
+
+
+        private FlowExecutor(){}
+
+        public static Res<FlowExecutor> Create(FlowGraph flowGraph){
+            var executor = new FlowExecutor();
+            executor._flowGraph = flowGraph;
+            var validateRes = flowGraph.ValidateGraph();
+            if (validateRes.IsFailure)
+            {
+                return Res<FlowExecutor>.Fail(validateRes.Message);
+            }
+            executor._nodeMap = flowGraph.Nodes.ToDictionary(node => node.Id, node => node);
+            return Res<FlowExecutor>.Ok(executor, validateRes.Message);
+        }
+
+        public void Start(){
+            CurrentNodeId = _flowGraph.Nodes.Where(node => node.Kind == NodeKind.StartNode).First().Id;
+        }
+
+        public void Execute()
+        {
+
+            var node = _nodeMap[CurrentNodeId];
+
+
+            // 检查输入 根据输入的连线找获取对应的值,如果没有则认为是默认值
+            // 如果输入是来自于expression 需要先执行获得结果
+
+
+            // 监听event
+
+            // 执行操作
+
+
+            
+            
+
+        }
 
     }
 
