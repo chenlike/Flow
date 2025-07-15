@@ -13,6 +13,10 @@ namespace JstFlow.Internal.Metas
         /// <summary>
         /// 表达式
         /// </summary>
-        Expression
+        Expression,
+        /// <summary>
+        /// 起点Node
+        /// </summary>
+        StartNode
     }
 }

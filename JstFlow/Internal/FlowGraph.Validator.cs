@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using JstFlow.Common;
+using JstFlow.Internal.Metas;
 
 namespace JstFlow.Internal
 {
@@ -16,14 +17,30 @@ namespace JstFlow.Internal
                 return Res.Fail("图中没有节点");
             }
 
-            // 检查节点ID重复
-            var nodeIds = new HashSet<long>();
+            // 先检查空节点
             foreach (var node in Nodes)
             {
                 if (node == null)
                 {
                     return Res.Fail("图中存在空节点");
                 }
+            }
+
+            // 检查必须有StartNode
+            var startNodes = Nodes.Where(n => n.Kind == NodeKind.StartNode).ToList();
+            if (startNodes.Count == 0)
+            {
+                return Res.Fail("图中必须包含至少一个开始节点");
+            }
+            if (startNodes.Count > 1)
+            {
+                return Res.Fail("图中只能有一个开始节点");
+            }
+
+            // 检查节点ID重复
+            var nodeIds = new HashSet<long>();
+            foreach (var node in Nodes)
+            {
 
                 if (nodeIds.Contains(node.Id))
                 {

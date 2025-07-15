@@ -7,6 +7,7 @@ using JstFlow.Internal.NodeMeta;
 using JstFlow.Attributes;
 using JstFlow.Common;
 using JstFlow.Internal.Metas;
+using JstFlow.External;
 
 
 namespace JstFlow.Internal
@@ -43,6 +44,10 @@ namespace JstFlow.Internal
             else
             {
                 nodeInfo.Kind = NodeKind.Node;
+                if (nodeType == typeof(StartNode))
+                {
+                    nodeInfo.Kind = NodeKind.StartNode;
+                }
                 // 获取节点名称
                 var flowNodeAttr = nodeType.GetCustomAttribute<FlowNodeAttribute>();
                 nodeInfo.Label = new Label(nodeType.Name, flowNodeAttr?.Label ?? nodeType.Name);

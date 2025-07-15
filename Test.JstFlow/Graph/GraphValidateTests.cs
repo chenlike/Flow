@@ -9,6 +9,7 @@ using JstFlow.Internal.NodeMeta;
 using JstFlow.Attributes;
 using JstFlow.Common;
 using JstFlow.Internal.Metas;
+using JstFlow.External;
 
 namespace Test.JstFlow.Graph
 {
@@ -145,6 +146,104 @@ namespace Test.JstFlow.Graph
             };
         }
 
+        private List<FlowNode> AddStartNodeToNodes(List<FlowNode> nodes)
+        {
+            var result = new List<FlowNode> { CreateStartNode() };
+            result.AddRange(nodes);
+            return result;
+        }
+
+        private FlowNode CreateStartNode()
+        {
+            return new FlowNode
+            {
+                Id = 100,
+                Label = new Label("StartNode", "开始节点"),
+                NodeImplType = typeof(StartNode),
+                Kind = NodeKind.StartNode,
+                InputFields = new List<InputField>(),
+                OutputFields = new List<OutputField>(),
+                Signals = new List<SignalInfo>
+                {
+                    new SignalInfo { Label = new Label("StartLoop", "开始循环") }
+                },
+                Emits = new List<EmitInfo>
+                {
+                    new EmitInfo { Label = new Label("Start", "开始执行") }
+                }
+            };
+        }
+
+        #endregion
+
+        #region StartNode验证测试
+
+        [Fact]
+        public void ValidateGraph_NoStartNode_ShouldReturnFailure()
+        {
+            // Arrange
+            var nodes = new List<FlowNode> { CreateTestNode1() };
+            var connections = new List<FlowConnection>();
+
+            // Act
+            var result = FlowGraph.Create(nodes, connections);
+
+            // Assert
+            Assert.False(result.IsSuccess);
+            Assert.Contains("图中必须包含至少一个开始节点", result.Message);
+        }
+
+        [Fact]
+        public void ValidateGraph_MultipleStartNodes_ShouldReturnFailure()
+        {
+            // Arrange
+            var startNode1 = CreateStartNode();
+            var startNode2 = CreateStartNode();
+            startNode2.Id = 101;
+            var nodes = new List<FlowNode> { startNode1, startNode2 };
+            var connections = new List<FlowConnection>();
+
+            // Act
+            var result = FlowGraph.Create(nodes, connections);
+
+            // Assert
+            Assert.False(result.IsSuccess);
+            Assert.Contains("图中只能有一个开始节点", result.Message);
+        }
+
+        [Fact]
+        public void ValidateGraph_WithStartNode_ShouldReturnSuccess()
+        {
+            // Arrange
+            var startNode = CreateStartNode();
+            var nodes = new List<FlowNode> { startNode };
+            var connections = new List<FlowConnection>();
+
+            // Act
+            var result = FlowGraph.Create(nodes, connections);
+
+            // Assert
+            Assert.True(result.IsSuccess);
+            Assert.Equal("图验证通过", result.Message);
+        }
+
+        [Fact]
+        public void ValidateGraph_StartNodeWithOtherNodes_ShouldReturnSuccess()
+        {
+            // Arrange
+            var startNode = CreateStartNode();
+            var testNode = CreateTestNode1();
+            var nodes = new List<FlowNode> { startNode, testNode };
+            var connections = new List<FlowConnection>();
+
+            // Act
+            var result = FlowGraph.Create(nodes, connections);
+
+            // Assert
+            Assert.True(result.IsSuccess);
+            Assert.Equal("图验证通过", result.Message);
+        }
+
         #endregion
 
         #region 基本验证测试
@@ -183,17 +282,16 @@ namespace Test.JstFlow.Graph
         public void ValidateGraph_ValidSingleNode_ShouldReturnSuccess()
         {
             // Arrange
-            var nodes = new List<FlowNode> { CreateTestNode1() };
+            var startNode = CreateStartNode();
+            var testNode = CreateTestNode1();
+            var nodes = new List<FlowNode> { startNode, testNode };
             var connections = new List<FlowConnection>();
 
             // Act
             var result = FlowGraph.Create(nodes, connections);
 
             // Assert
-            if (!result.IsSuccess)
-            {
-                Assert.True(false, $"验证失败: {result.Message}");
-            }
+            Assert.True(result.IsSuccess);
             Assert.Equal("图验证通过", result.Message);
         }
 
@@ -205,7 +303,8 @@ namespace Test.JstFlow.Graph
         public void ValidateGraph_NullNode_ShouldReturnFailure()
         {
             // Arrange
-            var nodes = new List<FlowNode> { CreateTestNode1(), null };
+            var startNode = CreateStartNode();
+            var nodes = new List<FlowNode> { startNode, null };
             var connections = new List<FlowConnection>();
 
             // Act
@@ -220,10 +319,11 @@ namespace Test.JstFlow.Graph
         public void ValidateGraph_DuplicateNodeId_ShouldReturnFailure()
         {
             // Arrange
+            var startNode = CreateStartNode();
             var node1 = CreateTestNode1();
             var node2 = CreateTestNode2();
             node2.Id = node1.Id; // 重复ID
-            var nodes = new List<FlowNode> { node1, node2 };
+            var nodes = new List<FlowNode> { startNode, node1, node2 };
             var connections = new List<FlowConnection>();
 
             // Act
@@ -238,9 +338,10 @@ namespace Test.JstFlow.Graph
         public void ValidateGraph_NodeWithoutImplType_ShouldReturnFailure()
         {
             // Arrange
+            var startNode = CreateStartNode();
             var node = CreateTestNode1();
             node.NodeImplType = null;
-            var nodes = new List<FlowNode> { node };
+            var nodes = new List<FlowNode> { startNode, node };
             var connections = new List<FlowConnection>();
 
             // Act
@@ -255,9 +356,10 @@ namespace Test.JstFlow.Graph
         public void ValidateGraph_NodeWithoutLabel_ShouldReturnFailure()
         {
             // Arrange
+            var startNode = CreateStartNode();
             var node = CreateTestNode1();
             node.Label = null;
-            var nodes = new List<FlowNode> { node };
+            var nodes = new List<FlowNode> { startNode, node };
             var connections = new List<FlowConnection>();
 
             // Act
@@ -278,7 +380,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node = CreateTestNode1();
             node.InputFields.Add(null);
-            var nodes = new List<FlowNode> { node };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node });
             var connections = new List<FlowConnection>();
 
             // Act
@@ -293,9 +395,10 @@ namespace Test.JstFlow.Graph
         public void ValidateGraph_InputFieldWithoutCode_ShouldReturnFailure()
         {
             // Arrange
+            var startNode = CreateStartNode();
             var node = CreateTestNode1();
             node.InputFields.Add(new InputField { Label = new Label("", "测试") });
-            var nodes = new List<FlowNode> { node };
+            var nodes = new List<FlowNode> { startNode, node };
             var connections = new List<FlowConnection>();
 
             // Act
@@ -312,7 +415,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node = CreateTestNode1();
             node.InputFields.Add(new InputField { Label = new Label("Input1", "重复输入") });
-            var nodes = new List<FlowNode> { node };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node });
             var connections = new List<FlowConnection>();
 
             // Act
@@ -333,7 +436,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node = CreateTestNode1();
             node.OutputFields.Add(null);
-            var nodes = new List<FlowNode> { node };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node });
             var connections = new List<FlowConnection>();
 
             // Act
@@ -350,7 +453,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node = CreateTestNode1();
             node.OutputFields.Add(new OutputField { Label = new Label("", "测试") });
-            var nodes = new List<FlowNode> { node };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node });
             var connections = new List<FlowConnection>();
 
             // Act
@@ -367,7 +470,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node = CreateTestNode1();
             node.OutputFields.Add(new OutputField { Label = new Label("Output1", "重复输出") });
-            var nodes = new List<FlowNode> { node };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node });
             var connections = new List<FlowConnection>();
 
             // Act
@@ -388,7 +491,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node = CreateTestNode1();
             node.Signals.Add(null);
-            var nodes = new List<FlowNode> { node };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node });
             var connections = new List<FlowConnection>();
 
             // Act
@@ -405,7 +508,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node = CreateTestNode1();
             node.Signals.Add(new SignalInfo { Label = new Label("", "测试") });
-            var nodes = new List<FlowNode> { node };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node });
             var connections = new List<FlowConnection>();
 
             // Act
@@ -422,7 +525,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node = CreateTestNode1();
             node.Signals.Add(new SignalInfo { Label = new Label("Signal1", "重复信号") });
-            var nodes = new List<FlowNode> { node };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node });
             var connections = new List<FlowConnection>();
 
             // Act
@@ -443,7 +546,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node = CreateTestNode1();
             node.Emits.Add(null);
-            var nodes = new List<FlowNode> { node };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node });
             var connections = new List<FlowConnection>();
 
             // Act
@@ -460,7 +563,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node = CreateTestNode1();
             node.Emits.Add(new EmitInfo { Label = new Label("", "测试") });
-            var nodes = new List<FlowNode> { node };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node });
             var connections = new List<FlowConnection>();
 
             // Act
@@ -477,7 +580,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node = CreateTestNode1();
             node.Emits.Add(new EmitInfo { Label = new Label("Event1", "重复事件") });
-            var nodes = new List<FlowNode> { node };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node });
             var connections = new List<FlowConnection>();
 
             // Act
@@ -496,7 +599,7 @@ namespace Test.JstFlow.Graph
         public void ValidateGraph_NullConnection_ShouldReturnFailure()
         {
             // Arrange
-            var nodes = new List<FlowNode> { CreateTestNode1() };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { CreateTestNode1() });
             var connections = new List<FlowConnection> { null };
 
             // Act
@@ -513,7 +616,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node1 = CreateTestNode1();
             var node2 = CreateTestNode2();
-            var nodes = new List<FlowNode> { node1, node2 };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node1, node2 });
             
             var connection1 = CreateOutputToInputConnection(node1.Id, "Output1", node2.Id, "InputA");
             var connection2 = CreateOutputToInputConnection(node1.Id, "Output2", node2.Id, "InputA");
@@ -534,7 +637,7 @@ namespace Test.JstFlow.Graph
         {
             // Arrange
             var node1 = CreateTestNode1();
-            var nodes = new List<FlowNode> { node1 };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node1 });
             var connections = new List<FlowConnection> 
             { 
                 CreateOutputToInputConnection(999, "Output1", node1.Id, "Input1") 
@@ -553,7 +656,7 @@ namespace Test.JstFlow.Graph
         {
             // Arrange
             var node1 = CreateTestNode1();
-            var nodes = new List<FlowNode> { node1 };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node1 });
             var connections = new List<FlowConnection> 
             { 
                 CreateOutputToInputConnection(node1.Id, "Output1", 999, "Input1") 
@@ -573,7 +676,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node1 = CreateTestNode1();
             var node2 = CreateTestNode2();
-            var nodes = new List<FlowNode> { node1, node2 };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node1, node2 });
             var connections = new List<FlowConnection> 
             { 
                 CreateOutputToInputConnection(node1.Id, "NonExistentOutput", node2.Id, "InputA") 
@@ -593,7 +696,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node1 = CreateTestNode1();
             var node2 = CreateTestNode2();
-            var nodes = new List<FlowNode> { node1, node2 };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node1, node2 });
             var connections = new List<FlowConnection> 
             { 
                 CreateOutputToInputConnection(node1.Id, "Output1", node2.Id, "NonExistentInput") 
@@ -613,7 +716,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node1 = CreateTestNode1();
             var node2 = CreateTestNode2();
-            var nodes = new List<FlowNode> { node1, node2 };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node1, node2 });
             var connections = new List<FlowConnection> 
             { 
                 CreateEventToSignalConnection(node1.Id, "NonExistentEvent", node2.Id, "SignalA") 
@@ -633,7 +736,7 @@ namespace Test.JstFlow.Graph
             // Arrange
             var node1 = CreateTestNode1();
             var node2 = CreateTestNode2();
-            var nodes = new List<FlowNode> { node1, node2 };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node1, node2 });
             var connections = new List<FlowConnection> 
             { 
                 CreateEventToSignalConnection(node1.Id, "Event1", node2.Id, "NonExistentSignal") 
@@ -652,7 +755,7 @@ namespace Test.JstFlow.Graph
         {
             // Arrange
             var node1 = CreateTestNode1();
-            var nodes = new List<FlowNode> { node1 };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node1 });
             var connections = new List<FlowConnection> 
             { 
                 CreateOutputToInputConnection(node1.Id, "Output1", node1.Id, "Input1") 
@@ -670,9 +773,10 @@ namespace Test.JstFlow.Graph
         public void ValidateGraph_ValidOutputToInputConnection_ShouldReturnSuccess()
         {
             // Arrange
+            var startNode = CreateStartNode();
             var node1 = CreateTestNode1();
             var node2 = CreateTestNode2();
-            var nodes = new List<FlowNode> { node1, node2 };
+            var nodes = new List<FlowNode> { startNode, node1, node2 };
             var connections = new List<FlowConnection> 
             { 
                 CreateOutputToInputConnection(node1.Id, "Output1", node2.Id, "InputA") 
@@ -689,9 +793,10 @@ namespace Test.JstFlow.Graph
         public void ValidateGraph_ValidEventToSignalConnection_ShouldReturnSuccess()
         {
             // Arrange
+            var startNode = CreateStartNode();
             var node1 = CreateTestNode1();
             var node2 = CreateTestNode2();
-            var nodes = new List<FlowNode> { node1, node2 };
+            var nodes = new List<FlowNode> { startNode, node1, node2 };
             var connections = new List<FlowConnection> 
             { 
                 CreateEventToSignalConnection(node1.Id, "Event1", node2.Id, "SignalA") 
@@ -716,7 +821,7 @@ namespace Test.JstFlow.Graph
             var node2 = CreateTestNode2();
             var node3 = CreateTestNode1();
             node3.Id = 3;
-            var nodes = new List<FlowNode> { node1, node2, node3 };
+            var nodes = AddStartNodeToNodes(new List<FlowNode> { node1, node2, node3 });
             
             var connections = new List<FlowConnection> 
             { 
@@ -740,6 +845,7 @@ namespace Test.JstFlow.Graph
         public void ValidateGraph_RequiredInputFieldWithoutConnection_ShouldReturnFailure()
         {
             // Arrange
+            var startNode = CreateStartNode();
             var node = new FlowNode
             {
                 Id = 1,
@@ -765,7 +871,7 @@ namespace Test.JstFlow.Graph
                     new EmitInfo { Label = new Label("Event1", "事件1") }
                 }
             };
-            var nodes = new List<FlowNode> { node };
+            var nodes = new List<FlowNode> { startNode, node };
             var connections = new List<FlowConnection>();
 
             // Act
@@ -780,9 +886,10 @@ namespace Test.JstFlow.Graph
         public void ValidateGraph_RequiredInputFieldWithConnection_ShouldReturnSuccess()
         {
             // Arrange
+            var startNode = CreateStartNode();
             var node1 = CreateTestNode1();
             var node2 = CreateTestNode2();
-            var nodes = new List<FlowNode> { node1, node2 };
+            var nodes = new List<FlowNode> { startNode, node1, node2 };
             var connections = new List<FlowConnection> 
             { 
                 CreateOutputToInputConnection(node2.Id, "OutputA", node1.Id, "Input2") 
@@ -803,13 +910,14 @@ namespace Test.JstFlow.Graph
         public void ValidateGraph_ComplexValidGraph_ShouldReturnSuccess()
         {
             // Arrange
+            var startNode = CreateStartNode();
             var node1 = CreateTestNode1();
             var node2 = CreateTestNode2();
             var node3 = CreateTestNode1();
             node3.Id = 3;
             node3.Label = new Label("TestNode3", "测试节点3");
             
-            var nodes = new List<FlowNode> { node1, node2, node3 };
+            var nodes = new List<FlowNode> { startNode, node1, node2, node3 };
             var connections = new List<FlowConnection> 
             { 
                 CreateOutputToInputConnection(node2.Id, "OutputA", node1.Id, "Input2"),
