@@ -8,6 +8,7 @@ using JstFlow.Attributes;
 using JstFlow.Common;
 using JstFlow.Internal.Metas;
 
+
 namespace JstFlow.Internal
 {
     public class NodeFactory
@@ -16,7 +17,7 @@ namespace JstFlow.Internal
         {
             var nodeInfo = new FlowNode
             {
-                Id = Guid.NewGuid(),
+                Id = Utils.GenId(),
                 InputFields = new List<InputField>(),
                 OutputFields = new List<OutputField>(),
                 Signals = new List<SignalInfo>(),
@@ -165,20 +166,5 @@ namespace JstFlow.Internal
             return false;
         }
 
-        /// <summary>
-        /// 获取表达式标签
-        /// </summary>
-        private static string GetExpressionLabel(Type type)
-        {
-            // 尝试获取FlowExpressionAttribute
-            var flowExpressionAttr = type.GetCustomAttribute<FlowExprAttribute>();
-            if (flowExpressionAttr != null && !string.IsNullOrEmpty(flowExpressionAttr.Label))
-            {
-                return flowExpressionAttr.Label;
-            }
-            
-            // 如果没有属性或标签为空，返回类型名称
-            return type.Name;
-        }
     }
 }

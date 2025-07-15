@@ -13,5 +13,10 @@ namespace JstFlow.External
     {
         [Emit("开始执行")]
         public event Action Start;
+
+        [Signal("开始循环")]
+        public void StartLoop()
+        {
+        }
     }
 }

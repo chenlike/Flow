@@ -30,7 +30,7 @@ namespace JstFlow.Internal
         /// <summary>
         /// 连接的唯一标识
         /// </summary>
-        public Guid Id { get; set; } = Guid.NewGuid();
+        public long Id { get; set; } = Utils.GenId();
 
         /// <summary>
         /// 连接类型
@@ -40,12 +40,12 @@ namespace JstFlow.Internal
         /// <summary>
         /// 源节点id
         /// </summary>
-        public Guid SourceNodeId { get; set; }
+        public long SourceNodeId { get; set; }
 
         /// <summary>
         /// 目标节点id
         /// </summary>
-        public Guid TargetNodeId { get; set; }
+        public long TargetNodeId { get; set; }
 
         /// <summary>
         /// 源端点名称（输出字段名或事件名）

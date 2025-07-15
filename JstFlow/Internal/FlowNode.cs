@@ -8,15 +8,11 @@ namespace JstFlow.Internal.NodeMeta
 {
     public class FlowNode
     {
-        public FlowNode()
-        {
-            Id = Guid.NewGuid();
-        }
 
         /// <summary>
         /// 节点的唯一标识
         /// </summary>
-        public Guid Id { get; set; } 
+        public long Id { get; set; } = Utils.GenId();
 
         /// <summary>
         /// 节点名称
