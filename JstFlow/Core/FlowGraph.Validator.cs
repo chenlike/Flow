@@ -191,6 +191,12 @@ namespace JstFlow.Core
                     var sourceNode = nodeDict[connection.SourceNodeId];
                     var targetNode = nodeDict[connection.TargetNodeId];
 
+                    // 检查是否存在环路（简单检查）
+                    if (connection.SourceNodeId == connection.TargetNodeId)
+                    {
+                        return Res.Fail($"连接 {connection.Id} 不能连接到自身节点");
+                    }
+
                     // 验证端点存在
                     if (connection.Type == ConnectionType.OutputToInput)
                     {
@@ -223,12 +229,6 @@ namespace JstFlow.Core
                         {
                             return Res.Fail($"连接 {connection.Id} 的目标节点 {connection.TargetNodeId} 不存在信号 {connection.TargetEndpointCode}");
                         }
-                    }
-
-                    // 检查是否存在环路（简单检查）
-                    if (connection.SourceNodeId == connection.TargetNodeId)
-                    {
-                        return Res.Fail($"连接 {connection.Id} 不能连接到自身节点");
                     }
                 }
 

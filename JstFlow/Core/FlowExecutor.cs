@@ -55,22 +55,58 @@ namespace JstFlow.Core
         public void Execute()
         {
 
-            var node = _nodeMap[CurrentNodeId];
 
 
-            // 检查输入 根据输入的连线找获取对应的值,如果没有则认为是默认值
-            // 如果输入是来自于expression 需要先执行获得结果
-
-
-            // 监听event
-
-            // 执行操作
-
-
-            
-            
+        
 
         }
+
+
+
+        private void PrepareNode(long nodeId)
+        {
+            var node = _nodeMap[nodeId];
+
+            var nodeConnections = _flowGraph.Connections.Where(connection => connection.TargetNodeId == nodeId).ToList();
+
+            Dictionary<string, object> inputValues = new Dictionary<string, object>();
+
+            // 获得这个节点input参数的连线 
+            foreach (InputField input in node.InputFields)
+            {
+
+                // 查找connection中作为字段连接的
+                var fieldConnection = nodeConnections.FirstOrDefault(connection => connection.Type == ConnectionType.OutputToInput && connection.TargetEndpointCode == input.Label.Code);
+                if (fieldConnection == null)
+                {
+                    // 这个字段没有连线
+                    continue;
+                }
+
+
+
+                // 获得这个字段连接的sourceNodeId
+                var sourceNodeId = fieldConnection.SourceNodeId;
+
+                // 获得这个sourceNodeId的节点
+                var sourceNode = _nodeMap[sourceNodeId];
+
+                // 根据Code 获得这个sourceNode的outputField  
+                var outputField = sourceNode.OutputFields.FirstOrDefault(field => field.Label.Code == fieldConnection.SourceEndpointCode);
+
+                
+
+                // 判断如果是来自expression的则直接执行获得值
+
+
+
+
+            }
+
+        }
+
+
+
 
     }
 
