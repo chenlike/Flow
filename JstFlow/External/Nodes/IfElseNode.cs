@@ -26,11 +26,11 @@ namespace JstFlow.External
         {
             if (Condition)
             {
-                return MoveNext(() => TrueBranch);
+                return Emit(() => TrueBranch);
             }
             else
             {
-                return MoveNext(() => FalseBranch);
+                return Emit(() => FalseBranch);
             }
         }
     }

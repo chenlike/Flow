@@ -32,19 +32,19 @@ namespace JstFlow.External
         private bool _isBreak;
 
         [FlowSignal("开始循环")]
-        public FlowOutEvent StartLoop()
+        public IEnumerable<FlowOutEvent> StartLoop()
         {
             _isBreak = false;
             while (Condition && CurrentIteration < MaxIterations)
             {
-                Execute(()=>LoopBody);
+                yield return Emit(()=>LoopBody);
                 CurrentIteration++;
                 if(_isBreak)
                 {
                     break;
                 }
             }
-            return MoveNext(()=>LoopCompleted);
+            yield return Emit(()=>LoopCompleted);
         }
 
         [FlowSignal("重置")]

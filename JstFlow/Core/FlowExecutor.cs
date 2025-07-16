@@ -11,6 +11,7 @@ using JstFlow.Common;
 using JstFlow.External.Nodes;
 using JstFlow.External.Expressions;
 using static JstFlow.Core.FlowExecutor;
+using System.Collections;
 
 namespace JstFlow.Core
 {
@@ -70,6 +71,11 @@ namespace JstFlow.Core
         internal Stack<ExecutionTask> _executionStack;
 
         /// <summary>
+        /// 当前正在执行的枚举器（用于yield return支持）
+        /// </summary>
+        private Dictionary<long, IEnumerator<FlowOutEvent>> _activeEnumerators;
+
+        /// <summary>
         /// 执行任务
         /// </summary>
         public class ExecutionTask
@@ -109,6 +115,7 @@ namespace JstFlow.Core
             _nodeContext = new NodeContext();
             _executionHistory = new List<long>();
             _executionStack = new Stack<ExecutionTask>();
+            _activeEnumerators = new Dictionary<long, IEnumerator<FlowOutEvent>>();
         }
 
         public static Res<FlowExecutor> Create(FlowGraph flowGraph){
@@ -147,6 +154,7 @@ namespace JstFlow.Core
             // 清空栈和历史
             _executionStack.Clear();
             _executionHistory.Clear();
+            _activeEnumerators.Clear();
             
             IsRunning = true;
             IsPaused = false;
@@ -411,7 +419,34 @@ namespace JstFlow.Core
             {
                 var result = signalInfo.MethodInfo.Invoke(nodeInstance, null);
                 
-                if (result is FlowOutEvent outEvent)
+                // 检查是否是IEnumerable<FlowOutEvent>（yield return模式）
+                if (result is IEnumerable<FlowOutEvent> enumerable)
+                {
+                    // 创建枚举器并开始执行
+                    var enumerator = enumerable.GetEnumerator();
+                    _activeEnumerators[nodeId] = enumerator;
+                    
+                    // 执行第一个yield return
+                    if (enumerator.MoveNext())
+                    {
+                        var outEvent = enumerator.Current;
+                        var nextNodeIds = GetNextNodeIds(nodeId, outEvent);
+                        foreach (var nextNodeId in nextNodeIds)
+                        {
+                            if (nextNodeId != 0)
+                            {
+                                var nextSignal = GetNextNodeSignal(nodeId, nextNodeId, outEvent);
+                                nextTasks.Add(new ExecutionTask(nextNodeId, null, 0, nextSignal));
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // 枚举器已完成，清理
+                        _activeEnumerators.Remove(nodeId);
+                    }
+                }
+                else if (result is FlowOutEvent outEvent)
                 {
                     // 获取下一个节点
                     var nextNodeIds = GetNextNodeIds(nodeId, outEvent);
@@ -428,6 +463,59 @@ namespace JstFlow.Core
             }
 
             return nextTasks;
+        }
+
+        /// <summary>
+        /// 继续执行指定节点的枚举器（用于yield return模式）
+        /// </summary>
+        public bool ContinueEnumerator(long nodeId)
+        {
+            if (!_activeEnumerators.ContainsKey(nodeId))
+            {
+                return false;
+            }
+
+            var enumerator = _activeEnumerators[nodeId];
+            if (enumerator.MoveNext())
+            {
+                var outEvent = enumerator.Current;
+                var nextNodeIds = GetNextNodeIds(nodeId, outEvent);
+                var nextTasks = new List<ExecutionTask>();
+                
+                foreach (var nextNodeId in nextNodeIds)
+                {
+                    if (nextNodeId != 0)
+                    {
+                        var nextSignal = GetNextNodeSignal(nodeId, nextNodeId, outEvent);
+                        nextTasks.Add(new ExecutionTask(nextNodeId, null, 0, nextSignal));
+                    }
+                }
+                
+                PushTasksToStack(nextTasks);
+                return true;
+            }
+            else
+            {
+                // 枚举器已完成，清理
+                _activeEnumerators.Remove(nodeId);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 获取当前活跃的枚举器节点ID列表
+        /// </summary>
+        public List<long> GetActiveEnumeratorNodes()
+        {
+            return _activeEnumerators.Keys.ToList();
+        }
+
+        /// <summary>
+        /// 检查指定节点是否有活跃的枚举器
+        /// </summary>
+        public bool HasActiveEnumerator(long nodeId)
+        {
+            return _activeEnumerators.ContainsKey(nodeId);
         }
 
         /// <summary>
@@ -510,7 +598,32 @@ namespace JstFlow.Core
             {
                 var result = executeSignal.MethodInfo.Invoke(nodeInstance, null);
                 
-                if (result is FlowOutEvent outEvent)
+                // 检查是否是IEnumerable<FlowOutEvent>（yield return模式）
+                if (result is IEnumerable<FlowOutEvent> enumerable)
+                {
+                    // 创建枚举器并开始执行
+                    var enumerator = enumerable.GetEnumerator();
+                    _activeEnumerators[startNodeId] = enumerator;
+                    
+                    // 执行第一个yield return
+                    if (enumerator.MoveNext())
+                    {
+                        var outEvent = enumerator.Current;
+                        var nextNodeIds = GetNextNodeIds(startNodeId, outEvent);
+                        var nextTasks = nextNodeIds.Where(id => id != 0)
+                                                  .Select(id => new ExecutionTask(id, null, 0, GetNextNodeSignal(startNodeId, id, outEvent)))
+                                                  .ToList();
+                        
+                        // 将下一个任务加入执行栈
+                        PushTasksToStack(nextTasks);
+                    }
+                    else
+                    {
+                        // 枚举器已完成，清理
+                        _activeEnumerators.Remove(startNodeId);
+                    }
+                }
+                else if (result is FlowOutEvent outEvent)
                 {
                     // 获取下一个节点
                     var nextNodeIds = GetNextNodeIds(startNodeId, outEvent);
@@ -624,6 +737,7 @@ namespace JstFlow.Core
             IsPaused = false;
             CurrentNodeId = 0;
             _executionStack.Clear();
+            _activeEnumerators.Clear();
         }
 
         /// <summary>
@@ -644,6 +758,7 @@ namespace JstFlow.Core
             _expressionInstances.Clear();
             _executionHistory.Clear();
             _executionStack.Clear();
+            _activeEnumerators.Clear();
         }
 
         /// <summary>
@@ -683,7 +798,7 @@ namespace JstFlow.Core
         /// </summary>
         public bool IsCompleted()
         {
-            return !IsRunning && _executionStack.Count == 0;
+            return !IsRunning && _executionStack.Count == 0 && _activeEnumerators.Count == 0;
         }
 
         /// <summary>
@@ -708,7 +823,9 @@ namespace JstFlow.Core
                 IsCompleted = IsCompleted(),
                 CurrentNodeId = CurrentNodeId,
                 PendingTaskCount = _executionStack.Count,
-                CanContinue = CanContinue()
+                CanContinue = CanContinue(),
+                ActiveEnumeratorCount = _activeEnumerators.Count,
+                ActiveEnumeratorNodes = GetActiveEnumeratorNodes()
             };
         }
 
@@ -725,7 +842,8 @@ namespace JstFlow.Core
                 ExecutionHistory = new List<long>(_executionHistory),
                 PendingTasks = new List<ExecutionTask>(_executionStack),
                 NodeInstances = new Dictionary<long, object>(_nodeInstances),
-                ExpressionInstances = new Dictionary<long, object>(_expressionInstances)
+                ExpressionInstances = new Dictionary<long, object>(_expressionInstances),
+                ActiveEnumerators = new Dictionary<long, IEnumerator<FlowOutEvent>>(_activeEnumerators)
             };
         }
 
@@ -746,6 +864,7 @@ namespace JstFlow.Core
             _executionStack = new Stack<ExecutionTask>(snapshot.PendingTasks);
             _nodeInstances = new Dictionary<long, object>(snapshot.NodeInstances);
             _expressionInstances = new Dictionary<long, object>(snapshot.ExpressionInstances);
+            _activeEnumerators = new Dictionary<long, IEnumerator<FlowOutEvent>>(snapshot.ActiveEnumerators);
         }
     }
 
@@ -793,6 +912,16 @@ namespace JstFlow.Core
         /// 是否可以继续执行
         /// </summary>
         public bool CanContinue { get; set; }
+
+        /// <summary>
+        /// 活跃枚举器数量
+        /// </summary>
+        public int ActiveEnumeratorCount { get; set; }
+
+        /// <summary>
+        /// 活跃枚举器节点ID列表
+        /// </summary>
+        public List<long> ActiveEnumeratorNodes { get; set; }
     }
 
     /// <summary>
@@ -834,5 +963,10 @@ namespace JstFlow.Core
         /// 表达式实例
         /// </summary>
         public Dictionary<long, object> ExpressionInstances { get; set; }
+
+        /// <summary>
+        /// 活跃枚举器
+        /// </summary>
+        public Dictionary<long, IEnumerator<FlowOutEvent>> ActiveEnumerators { get; set; }
     }
 }

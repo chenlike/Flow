@@ -57,15 +57,10 @@ namespace JstFlow.External.Nodes
             _context = context;
         }
 
-        public FlowOutEvent MoveNext(Expression<Func<FlowEndpoint>> expression)
+        public FlowOutEvent Emit(Expression<Func<FlowEndpoint>> expression)
         {
             return FlowOutEvent.Of(expression);
         }
-        protected void Execute(Expression<Func<FlowEndpoint>> expression)
-        {
-            _context.TriggerFlowEvent(FlowOutEvent.Of(expression));
-        }
-
 
 
     }

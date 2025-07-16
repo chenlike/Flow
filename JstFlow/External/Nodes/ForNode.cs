@@ -40,21 +40,22 @@ namespace JstFlow.External
 
 
         [FlowSignal("开始循环")]
-        public FlowOutEvent StartLoop()
+        public IEnumerable<FlowOutEvent> StartLoop()
         {
             // 重置状态
             Reset();
 
             for (CurrentIndex = Start; CurrentIndex <= End; CurrentIndex += Step)
             {
-                Execute(()=>LoopBody);
+                yield return Emit(()=>LoopBody);
                 if(BreakCondition)
                 {
                     break;
                 }
             }
 
-            return MoveNext(()=>LoopCompleted);
+            yield return Emit(()=>LoopCompleted);
+            Console.WriteLine("循环完成");
         }
 
         [FlowSignal("重置")]
