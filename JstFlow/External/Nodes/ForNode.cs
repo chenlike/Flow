@@ -2,74 +2,76 @@
 using System.Collections.Generic;
 using System.Text;
 using JstFlow.Attributes;
-using JstFlow.Internal.Metas;
+using JstFlow.Core.Interfaces;
+using JstFlow.Core.Metas;
+using JstFlow.External.Nodes;
 
 namespace JstFlow.External
 {
     [FlowNode("For循环节点")]
-    public class ForNode
+    public class ForNode : FlowBaseNode
     {
-        [Input("起始值", Required = true)]
+        [FlowInput("起始值", Required = true)]
         public int Start { get; set; }
 
-        [Input("结束值", Required = true)]
+        [FlowInput("结束值", Required = true)]
         public int End { get; set; }
 
-        [Input("步长")]
+        [FlowInput("步长")]
         public int Step { get; set; } = 1;
 
-        [Input("中断条件")]
+        [FlowInput("中断条件")]
         public bool BreakCondition { get; set; }
 
-        [Output("当前索引")]
+        [FlowOutput("当前索引")]
         public int CurrentIndex { get; set; }
 
-        [Output("是否完成")]
+        [FlowOutput("是否完成")]
         public bool IsCompleted { get; set; }
 
-        [Output("是否被中断")]
+        [FlowOutput("是否被中断")]
         public bool IsBreak { get; set; }
 
-        [Emit("循环体")]
-        public event Action LoopBody;
+        [FlowEvent("循环体")]
+        public FlowEndpoint LoopBody { get; set; }
 
-        [Signal("开始循环")]
-        public void StartLoop()
+        [FlowEvent("循环完成")]
+        public FlowEndpoint LoopCompleted { get; set; }
+
+
+        [FlowSignal("开始循环")]
+        public FlowOutEvent StartLoop()
         {
-            IsCompleted = false;
-            IsBreak = false;
-            CurrentIndex = Start;
-            
-            while (CurrentIndex <= End)
+            // 重置状态
+            Reset();
+
+            for (CurrentIndex = Start; CurrentIndex <= End; CurrentIndex += Step)
             {
-                // 检查中断条件
-                if (BreakCondition)
+                Execute(()=>LoopBody);
+                if(BreakCondition)
                 {
-                    IsBreak = true;
                     break;
                 }
-
-                LoopBody?.Invoke();
-                CurrentIndex += Step;
             }
-            
-            IsCompleted = true;
+
+            return MoveNext(()=>LoopCompleted);
         }
 
-        [Signal("重置")]
+        [FlowSignal("重置")]
         public void Reset()
         {
             CurrentIndex = Start;
             IsCompleted = false;
             IsBreak = false;
+            BreakCondition = false;
         }
 
-        [Signal("中断循环")]
+        [FlowSignal("中断循环")]
         public void Break()
         {
             BreakCondition = true;
+            IsBreak = true;
         }
-
 
     }
 }

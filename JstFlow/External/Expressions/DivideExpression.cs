@@ -1,5 +1,5 @@
 using JstFlow.Attributes;
-using JstFlow.Internal.Metas;
+using JstFlow.Core.Metas;
 using System;
 
 namespace JstFlow.External.Expressions
@@ -7,10 +7,10 @@ namespace JstFlow.External.Expressions
     [FlowExpr("除法")]
     public class DivideExpression<T> : FlowExpression<T> where T : struct
     {
-        [Input("左操作数")]
+        [FlowInput("左操作数")]
         public T Left { get; set; }
 
-        [Input("右操作数")]
+        [FlowInput("右操作数")]
         public T Right { get; set; }
 
         public override T Evaluate()

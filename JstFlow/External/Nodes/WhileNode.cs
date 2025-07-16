@@ -2,58 +2,63 @@
 using System.Collections.Generic;
 using System.Text;
 using JstFlow.Attributes;
-using JstFlow.Internal.Metas;
+using JstFlow.Core.Metas;
+using JstFlow.External.Nodes;
 
 namespace JstFlow.External
 {
     [FlowNode("While循环节点")]
-    public class WhileNode
+    public class WhileNode : FlowBaseNode
     {
-        [Input("循环条件", Required = true)]
+        [FlowInput("循环条件", Required = true)]
         public bool Condition { get; set; }
 
-        [Input("最大循环次数")]
+        [FlowInput("最大循环次数")]
         public int MaxIterations { get; set; } = 1000;
 
-        [Output("当前迭代次数")]
+        [FlowOutput("当前迭代次数")]
         public int CurrentIteration { get; set; }
 
-        [Output("是否完成")]
+        [FlowOutput("是否完成")]
         public bool IsCompleted { get; set; }
 
-        [Emit("循环体")]
-        public event Action LoopBody;
+        [FlowEvent("循环体")]
+        public FlowEndpoint LoopBody { get; set; }
 
-        [Emit("循环完成")]
-        public event Action LoopCompleted;
+        [FlowEvent("循环完成")]
+        public FlowEndpoint LoopCompleted { get; set; }
 
-        [Signal("开始循环")]
-        public void StartLoop()
+
+        private bool _isBreak;
+
+        [FlowSignal("开始循环")]
+        public FlowOutEvent StartLoop()
         {
-            IsCompleted = false;
-            CurrentIteration = 0;
-
+            _isBreak = false;
             while (Condition && CurrentIteration < MaxIterations)
             {
+                Execute(()=>LoopBody);
                 CurrentIteration++;
-                LoopBody?.Invoke();
+                if(_isBreak)
+                {
+                    break;
+                }
             }
-
-            IsCompleted = true;
-            LoopCompleted?.Invoke();
+            return MoveNext(()=>LoopCompleted);
         }
 
-        [Signal("重置")]
+        [FlowSignal("重置")]
         public void Reset()
         {
             CurrentIteration = 0;
             IsCompleted = false;
         }
 
-        [Signal("停止循环")]
-        public void StopLoop()
+        [FlowSignal("停止循环")]
+        public void Break()
         {
-            Condition = false;
+            _isBreak = true;
         }
+
     }
 }

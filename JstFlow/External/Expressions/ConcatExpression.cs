@@ -1,30 +1,23 @@
 using JstFlow.Attributes;
-using JstFlow.Internal.Metas;
+using JstFlow.Core.Metas;
 using System;
+using System.Collections.Generic;
 
 namespace JstFlow.External.Expressions
 {
     [FlowExpr("文本拼接")]
     public class ConcatExpression : FlowExpression<string>
     {
-        [Input("文本1")]
-        public string String1 { get; set; }
-
-        [Input("文本2")]
-        public string String2 { get; set; }
-
-        [Input("文本3")]
-        public string String3 { get; set; }
-
-        [Input("文本4")]
-        public string String4 { get; set; }
-
-        [Input("文本5")]
-        public string String5 { get; set; }
+        [FlowInput("文本列表")]
+        public List<string> StringList { get; set; }
 
         public override string Evaluate()
         {
-            return (String1 ?? "") + (String2 ?? "") + (String3 ?? "") + (String4 ?? "") + (String5 ?? "");
+            if(StringList == null)
+            {
+                return "";
+            }
+            return string.Join("", StringList);
         }
     }
 } 

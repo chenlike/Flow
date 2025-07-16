@@ -1,4 +1,5 @@
 ﻿using JstFlow.Attributes;
+using JstFlow.External.Nodes;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -9,15 +10,15 @@ namespace JstFlow.External
     /// 开始节点 每个图都必须要有
     /// </summary>
     [FlowNode("开始")]
-    public class StartNode
+    public class StartNode:FlowBaseNode
     {
-        [Emit("开始执行")]
-        public event Action Start;
+        [FlowEvent("开始执行")]
+        public FlowEndpoint Start { get; set; }
 
-        [Signal("开始循环")]
-        public void StartLoop()
+        [FlowSignal("开始循环")]
+        public FlowOutEvent StartLoop()
         {
-            Start?.Invoke();
+            return MoveNext(()=>Start);
         }
     }
 }

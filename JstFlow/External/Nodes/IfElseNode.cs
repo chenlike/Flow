@@ -2,34 +2,36 @@
 using System.Collections.Generic;
 using System.Text;
 using JstFlow.Attributes;
-using JstFlow.Internal.Metas;
+using JstFlow.Core.Metas;
+using JstFlow.External.Nodes;
 
 namespace JstFlow.External
 {
     [FlowNode("If-Else条件节点")]
-    public class IfElseNode
+    public class IfElseNode:FlowBaseNode
     {
-        [Input("条件", Required = true)]
+        [FlowInput("条件", Required = true)]
         public bool Condition { get; set; }
 
-        [Emit("那么")]
-        public event Action TrueBranch;
 
-        [Emit("否则")]
-        public event Action FalseBranch;
+        [FlowEvent("真")]
+        public FlowEndpoint TrueBranch { get; set; }
 
-        [Signal("执行")]
-        public void ExecuteCondition()
+        [FlowEvent("假")]
+        public FlowEndpoint FalseBranch { get; set; }
+
+
+        [FlowSignal("执行")]
+        public FlowOutEvent Execute()
         {
             if (Condition)
             {
-                TrueBranch?.Invoke();
+                return MoveNext(() => TrueBranch);
             }
             else
             {
-                FalseBranch?.Invoke();
+                return MoveNext(() => FalseBranch);
             }
         }
-
     }
 }

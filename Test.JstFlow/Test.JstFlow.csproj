@@ -32,4 +32,11 @@
     <ProjectReference Include="..\JstFlow\JstFlow.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Node\" />
+    <Folder Include="Expression\" />
+    <Folder Include="Graph\" />
+    <Folder Include="Executor\" />
+  </ItemGroup>
+
 </Project>

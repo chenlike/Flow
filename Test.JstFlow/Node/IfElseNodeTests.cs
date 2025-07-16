@@ -1,208 +1,129 @@
-using System;
-using System.Collections.Generic;
-using Xunit;
 using JstFlow.External;
-using JstFlow.Internal;
-using JstFlow.Internal.NodeMeta;
-using JstFlow.Internal.Metas;
+using JstFlow.Core;
+using JstFlow.Attributes;
+using JstFlow.External.Nodes;
+using Xunit;
+using System;
+using System.Reflection;
 
 namespace Test.JstFlow.Node
 {
     public class IfElseNodeTests
     {
         [Fact]
-        public void IfElseNode_ExecuteCondition_WithTrueCondition_ShouldInvokeTrueBranch()
-        {
-            // Arrange
-            var ifElseNode = new IfElseNode();
-            var trueBranchInvoked = false;
-            var falseBranchInvoked = false;
-            
-            ifElseNode.Condition = true;
-            ifElseNode.TrueBranch += () => trueBranchInvoked = true;
-            ifElseNode.FalseBranch += () => falseBranchInvoked = true;
-
-            // Act
-            ifElseNode.ExecuteCondition();
-
-            // Assert
-            Assert.True(trueBranchInvoked);
-            Assert.False(falseBranchInvoked);
-        }
-
-        [Fact]
-        public void IfElseNode_ExecuteCondition_WithFalseCondition_ShouldInvokeFalseBranch()
-        {
-            // Arrange
-            var ifElseNode = new IfElseNode();
-            var trueBranchInvoked = false;
-            var falseBranchInvoked = false;
-            
-            ifElseNode.Condition = false;
-            ifElseNode.TrueBranch += () => trueBranchInvoked = true;
-            ifElseNode.FalseBranch += () => falseBranchInvoked = true;
-
-            // Act
-            ifElseNode.ExecuteCondition();
-
-            // Assert
-            Assert.False(trueBranchInvoked);
-            Assert.True(falseBranchInvoked);
-        }
-
-        [Fact]
-        public void IfElseNode_ExecuteCondition_WithTrueCondition_WithoutEventHandlers_ShouldNotThrow()
-        {
-            // Arrange
-            var ifElseNode = new IfElseNode();
-            ifElseNode.Condition = true;
-
-            // Act & Assert
-            var exception = Record.Exception(() => ifElseNode.ExecuteCondition());
-            Assert.Null(exception);
-        }
-
-        [Fact]
-        public void IfElseNode_ExecuteCondition_WithFalseCondition_WithoutEventHandlers_ShouldNotThrow()
-        {
-            // Arrange
-            var ifElseNode = new IfElseNode();
-            ifElseNode.Condition = false;
-
-            // Act & Assert
-            var exception = Record.Exception(() => ifElseNode.ExecuteCondition());
-            Assert.Null(exception);
-        }
-
-        [Fact]
-        public void IfElseNode_ExecuteCondition_WithMultipleHandlers_ShouldInvokeAll()
-        {
-            // Arrange
-            var ifElseNode = new IfElseNode();
-            var handler1Invoked = false;
-            var handler2Invoked = false;
-            
-            ifElseNode.Condition = true;
-            ifElseNode.TrueBranch += () => handler1Invoked = true;
-            ifElseNode.TrueBranch += () => handler2Invoked = true;
-
-            // Act
-            ifElseNode.ExecuteCondition();
-
-            // Assert
-            Assert.True(handler1Invoked);
-            Assert.True(handler2Invoked);
-        }
-
-        [Fact]
-        public void IfElseNode_ExecuteCondition_WithDynamicConditionChange_ShouldUseCurrentValue()
-        {
-            // Arrange
-            var ifElseNode = new IfElseNode();
-            var trueBranchInvoked = false;
-            var falseBranchInvoked = false;
-            
-            ifElseNode.TrueBranch += () => trueBranchInvoked = true;
-            ifElseNode.FalseBranch += () => falseBranchInvoked = true;
-
-            // Act - 先设置为true
-            ifElseNode.Condition = true;
-            ifElseNode.ExecuteCondition();
-
-            // Assert - 应该执行true分支
-            Assert.True(trueBranchInvoked);
-            Assert.False(falseBranchInvoked);
-
-            // 重置
-            trueBranchInvoked = false;
-            falseBranchInvoked = false;
-
-            // Act - 再设置为false
-            ifElseNode.Condition = false;
-            ifElseNode.ExecuteCondition();
-
-            // Assert - 应该执行false分支
-            Assert.False(trueBranchInvoked);
-            Assert.True(falseBranchInvoked);
-        }
-
-        [Fact]
-        public void IfElseNode_NodeInfo_ShouldHaveCorrectMetadata()
+        public void IfElseNode_ShouldHaveCorrectAttributes()
         {
             // Arrange & Act
-            var nodeInfo = NodeFactory.CreateNodeInfo(typeof(IfElseNode));
-
+            var ifElseNode = new IfElseNode();
+            
             // Assert
-            Assert.Equal("IfElseNode", nodeInfo.Label.Code);
-            Assert.Equal("If-Else条件节点", nodeInfo.Label.DisplayName);
-            Assert.Equal(typeof(IfElseNode), nodeInfo.NodeImplType);
-            Assert.Equal(NodeKind.Node, nodeInfo.Kind);
-
-            // 验证输入字段
-            Assert.Single(nodeInfo.InputFields);
-            var conditionInput = nodeInfo.InputFields[0];
-            Assert.Equal("Condition", conditionInput.Label.Code);
-            Assert.Equal("条件", conditionInput.Label.DisplayName);
-            Assert.True(conditionInput.Required);
-            Assert.Equal("Boolean", conditionInput.Type);
-
-            // 验证输出字段
-            Assert.Empty(nodeInfo.OutputFields);
-
-            // 验证信号
-            Assert.Single(nodeInfo.Signals);
-            var executeSignal = nodeInfo.Signals[0];
-            Assert.Equal("ExecuteCondition", executeSignal.Label.Code);
-            Assert.Equal("执行", executeSignal.Label.DisplayName);
-
-            // 验证事件
-            Assert.Equal(2, nodeInfo.Emits.Count);
-            var trueBranchEmit = nodeInfo.Emits.Find(e => e.Label.Code == "TrueBranch");
-            Assert.NotNull(trueBranchEmit);
-            Assert.Equal("那么", trueBranchEmit.Label.DisplayName);
-
-            var falseBranchEmit = nodeInfo.Emits.Find(e => e.Label.Code == "FalseBranch");
-            Assert.NotNull(falseBranchEmit);
-            Assert.Equal("否则", falseBranchEmit.Label.DisplayName);
+            var nodeAttribute = typeof(IfElseNode).GetCustomAttributes(typeof(FlowNodeAttribute), false);
+            Assert.Single(nodeAttribute);
+            Assert.Equal("If-Else条件节点", ((FlowNodeAttribute)nodeAttribute[0]).Label);
         }
 
         [Fact]
-        public void IfElseNode_ExecuteCondition_WithComplexLogic_ShouldWorkCorrectly()
+        public void IfElseNode_ShouldHaveRequiredProperties()
         {
             // Arrange
             var ifElseNode = new IfElseNode();
-            var result = "";
             
-            ifElseNode.TrueBranch += () => result += "True";
-            ifElseNode.FalseBranch += () => result += "False";
-
-            // Act - 测试边界条件
-            ifElseNode.Condition = true;
-            ifElseNode.ExecuteCondition();
-            ifElseNode.ExecuteCondition(); // 多次执行
-
-            // Assert
-            Assert.Equal("TrueTrue", result);
+            // Act & Assert
+            // 属性应该存在，但可能为 null
+            Assert.True(typeof(IfElseNode).GetProperty("TrueBranch") != null);
+            Assert.True(typeof(IfElseNode).GetProperty("FalseBranch") != null);
         }
 
-        [Fact]
-        public void IfElseNode_ExecuteCondition_WithEventRemoval_ShouldWorkCorrectly()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void IfElseNode_Execute_ShouldReturnCorrectBranch(bool condition)
         {
             // Arrange
-            var ifElseNode = new IfElseNode();
-            var invocationCount = 0;
+            var ifElseNode = new IfElseNode
+            {
+                Condition = condition
+            };
+            var context = new NodeContext();
+            ifElseNode.Inject(context);
             
-            Action handler = () => invocationCount++;
-            ifElseNode.Condition = true;
-            ifElseNode.TrueBranch += handler;
-
             // Act
-            ifElseNode.ExecuteCondition();
-            ifElseNode.TrueBranch -= handler;
-            ifElseNode.ExecuteCondition();
-
+            var result = ifElseNode.Execute();
+            
             // Assert
-            Assert.Equal(1, invocationCount);
+            Assert.NotNull(result);
+            Assert.IsType<FlowOutEvent>(result);
+            
+            var compiledExpression = result.Expression.Compile();
+            var expectedEndpoint = condition ? ifElseNode.TrueBranch : ifElseNode.FalseBranch;
+            Assert.Equal(expectedEndpoint, compiledExpression());
+        }
+
+        [Fact]
+        public void IfElseNode_Execute_WhenConditionIsTrue_ShouldReturnTrueBranch()
+        {
+            // Arrange
+            var ifElseNode = new IfElseNode
+            {
+                Condition = true
+            };
+            var context = new NodeContext();
+            ifElseNode.Inject(context);
+            
+            // Act
+            var result = ifElseNode.Execute();
+            
+            // Assert
+            var compiledExpression = result.Expression.Compile();
+            Assert.Equal(ifElseNode.TrueBranch, compiledExpression());
+        }
+
+        [Fact]
+        public void IfElseNode_Execute_WhenConditionIsFalse_ShouldReturnFalseBranch()
+        {
+            // Arrange
+            var ifElseNode = new IfElseNode
+            {
+                Condition = false
+            };
+            var context = new NodeContext();
+            ifElseNode.Inject(context);
+            
+            // Act
+            var result = ifElseNode.Execute();
+            
+            // Assert
+            var compiledExpression = result.Expression.Compile();
+            Assert.Equal(ifElseNode.FalseBranch, compiledExpression());
+        }
+
+        [Fact]
+        public void IfElseNode_ShouldHaveCorrectSignalAttribute()
+        {
+            // Arrange
+            var ifElseNode = new IfElseNode();
+            
+            // Act
+            var methodInfo = typeof(IfElseNode).GetMethod("Execute");
+            var signalAttribute = methodInfo.GetCustomAttributes(typeof(FlowSignalAttribute), false);
+            
+            // Assert
+            Assert.Single(signalAttribute);
+            Assert.Equal("执行", ((FlowSignalAttribute)signalAttribute[0]).Label);
+        }
+
+        [Fact]
+        public void IfElseNode_ConditionProperty_ShouldBeSettable()
+        {
+            // Arrange
+            var ifElseNode = new IfElseNode();
+            var expectedCondition = true;
+            
+            // Act
+            ifElseNode.Condition = expectedCondition;
+            
+            // Assert
+            Assert.Equal(expectedCondition, ifElseNode.Condition);
         }
     }
 } 

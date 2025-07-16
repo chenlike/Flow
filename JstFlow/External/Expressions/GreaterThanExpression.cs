@@ -1,5 +1,5 @@
 using JstFlow.Attributes;
-using JstFlow.Internal.Metas;
+using JstFlow.Core.Metas;
 using System;
 
 namespace JstFlow.External.Expressions
@@ -7,10 +7,10 @@ namespace JstFlow.External.Expressions
     [FlowExpr("大于")]
     public class GreaterThanExpression<T> : FlowExpression<bool> where T : IComparable<T>
     {
-        [Input("左操作数")]
+        [FlowInput("左操作数")]
         public T Left { get; set; }
 
-        [Input("右操作数")]
+        [FlowInput("右操作数")]
         public T Right { get; set; }
 
         public override bool Evaluate()

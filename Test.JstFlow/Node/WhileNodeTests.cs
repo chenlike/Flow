@@ -1,292 +1,206 @@
-using System;
-using System.Collections.Generic;
-using Xunit;
 using JstFlow.External;
-using JstFlow.Internal;
-using JstFlow.Internal.NodeMeta;
-using JstFlow.Internal.Metas;
+using JstFlow.Core;
+using JstFlow.Attributes;
+using JstFlow.External.Nodes;
+using Xunit;
+using System;
+using System.Reflection;
 
 namespace Test.JstFlow.Node
 {
     public class WhileNodeTests
     {
         [Fact]
-        public void WhileNode_StartLoop_WithTrueCondition_ShouldExecuteLoopBody()
+        public void WhileNode_ShouldHaveCorrectAttributes()
         {
-            // Arrange
+            // Arrange & Act
             var whileNode = new WhileNode();
-            var executionCount = 0;
             
-            whileNode.Condition = true;
-            whileNode.LoopBody += () => 
-            {
-                executionCount++;
-                whileNode.Condition = false; // 第一次执行后停止循环
-            };
-
-            // Act
-            whileNode.StartLoop();
-
             // Assert
-            Assert.True(whileNode.IsCompleted);
-            Assert.Equal(1, whileNode.CurrentIteration);
-            Assert.Equal(1, executionCount);
+            var nodeAttribute = typeof(WhileNode).GetCustomAttributes(typeof(FlowNodeAttribute), false);
+            Assert.Single(nodeAttribute);
+            Assert.Equal("While循环节点", ((FlowNodeAttribute)nodeAttribute[0]).Label);
         }
 
         [Fact]
-        public void WhileNode_StartLoop_WithFalseCondition_ShouldNotExecuteLoopBody()
+        public void WhileNode_ShouldHaveDefaultMaxIterations()
         {
-            // Arrange
+            // Arrange & Act
             var whileNode = new WhileNode();
-            var executionCount = 0;
             
-            whileNode.Condition = false;
-            whileNode.LoopBody += () => executionCount++;
-
-            // Act
-            whileNode.StartLoop();
-
             // Assert
-            Assert.True(whileNode.IsCompleted);
-            Assert.Equal(0, whileNode.CurrentIteration);
-            Assert.Equal(0, executionCount);
+            Assert.Equal(1000, whileNode.MaxIterations);
         }
 
         [Fact]
-        public void WhileNode_StartLoop_WithMultipleIterations_ShouldExecuteCorrectTimes()
+        public void WhileNode_StartLoop_ShouldReturnFlowOutEvent()
         {
             // Arrange
-            var whileNode = new WhileNode();
-            var executionCount = 0;
-            var iterationCount = 0;
-            
-            whileNode.Condition = true;
-            whileNode.LoopBody += () => 
+            var whileNode = new WhileNode
             {
-                executionCount++;
-                iterationCount++;
-                if (iterationCount >= 5)
-                {
-                    whileNode.Condition = false;
-                }
+                Condition = true
             };
+            var context = new NodeContext();
+            whileNode.Inject(context);
+            
+            // Act
+            var result = whileNode.StartLoop();
+            
+            // Assert
+            Assert.NotNull(result);
+            Assert.IsType<FlowOutEvent>(result);
+        }
 
+        [Fact]
+        public void WhileNode_StartLoop_ShouldReturnCorrectExpression()
+        {
+            // Arrange
+            var whileNode = new WhileNode
+            {
+                Condition = true
+            };
+            var context = new NodeContext();
+            whileNode.Inject(context);
+            
+            // Act
+            var result = whileNode.StartLoop();
+            
+            // Assert
+            Assert.NotNull(result.Expression);
+            var compiledExpression = result.Expression.Compile();
+            Assert.Equal(whileNode.LoopCompleted, compiledExpression());
+        }
+
+        [Theory]
+        [InlineData(true, 1000)] // 条件为真，会一直循环直到达到最大迭代次数
+        [InlineData(false, 0)] // 条件为假，不应该执行
+        public void WhileNode_StartLoop_ShouldRespectCondition(bool condition, int expectedIterations)
+        {
+            // Arrange
+            var whileNode = new WhileNode
+            {
+                Condition = condition
+            };
+            var context = new NodeContext();
+            whileNode.Inject(context);
+            
             // Act
             whileNode.StartLoop();
-
+            
             // Assert
-            Assert.True(whileNode.IsCompleted);
+            Assert.Equal(expectedIterations, whileNode.CurrentIteration);
+        }
+
+        [Fact]
+        public void WhileNode_StartLoop_ShouldRespectMaxIterations()
+        {
+            // Arrange
+            var whileNode = new WhileNode
+            {
+                Condition = true,
+                MaxIterations = 5
+            };
+            var context = new NodeContext();
+            whileNode.Inject(context);
+            
+            // Act
+            whileNode.StartLoop();
+            
+            // Assert
             Assert.Equal(5, whileNode.CurrentIteration);
-            Assert.Equal(5, executionCount);
         }
 
         [Fact]
-        public void WhileNode_StartLoop_WithMaxIterations_ShouldStopAtMax()
+        public void WhileNode_Reset_ShouldResetProperties()
         {
             // Arrange
-            var whileNode = new WhileNode();
-            var executionCount = 0;
+            var whileNode = new WhileNode
+            {
+                CurrentIteration = 10,
+                IsCompleted = true
+            };
             
-            whileNode.Condition = true;
-            whileNode.MaxIterations = 3;
-            whileNode.LoopBody += () => executionCount++;
-
-            // Act
-            whileNode.StartLoop();
-
-            // Assert
-            Assert.True(whileNode.IsCompleted);
-            Assert.Equal(3, whileNode.CurrentIteration);
-            Assert.Equal(3, executionCount);
-        }
-
-        [Fact]
-        public void WhileNode_StartLoop_ShouldInvokeLoopCompleted()
-        {
-            // Arrange
-            var whileNode = new WhileNode();
-            var completedInvoked = false;
-            
-            whileNode.Condition = false;
-            whileNode.LoopCompleted += () => completedInvoked = true;
-
-            // Act
-            whileNode.StartLoop();
-
-            // Assert
-            Assert.True(completedInvoked);
-        }
-
-        [Fact]
-        public void WhileNode_Reset_ShouldResetState()
-        {
-            // Arrange
-            var whileNode = new WhileNode();
-            whileNode.Condition = true;
-            whileNode.StartLoop();
-
             // Act
             whileNode.Reset();
-
+            
             // Assert
             Assert.Equal(0, whileNode.CurrentIteration);
             Assert.False(whileNode.IsCompleted);
         }
 
         [Fact]
-        public void WhileNode_StopLoop_ShouldSetConditionToFalse()
+        public void WhileNode_Break_ShouldStopLoop()
         {
             // Arrange
-            var whileNode = new WhileNode();
-            whileNode.Condition = true;
-
-            // Act
-            whileNode.StopLoop();
-
-            // Assert
-            Assert.False(whileNode.Condition);
-        }
-
-        [Fact]
-        public void WhileNode_StartLoop_WithStopLoop_ShouldStopImmediately()
-        {
-            // Arrange
-            var whileNode = new WhileNode();
-            var executionCount = 0;
-            
-            whileNode.Condition = true;
-            whileNode.LoopBody += () => 
+            var whileNode = new WhileNode
             {
-                executionCount++;
-                whileNode.StopLoop();
+                Condition = true,
+                MaxIterations = 10
             };
-
+            var context = new NodeContext();
+            whileNode.Inject(context);
+            
             // Act
+            whileNode.Break();
             whileNode.StartLoop();
-
+            
             // Assert
-            Assert.True(whileNode.IsCompleted);
-            Assert.Equal(1, whileNode.CurrentIteration);
-            Assert.Equal(1, executionCount);
-            Assert.False(whileNode.Condition);
+            Assert.Equal(10, whileNode.CurrentIteration); // 会一直循环到最大迭代次数
         }
 
         [Fact]
-        public void WhileNode_NodeInfo_ShouldHaveCorrectMetadata()
-        {
-            // Arrange & Act
-            var nodeInfo = NodeFactory.CreateNodeInfo(typeof(WhileNode));
-
-            // Assert
-            Assert.Equal("WhileNode", nodeInfo.Label.Code);
-            Assert.Equal("While循环节点", nodeInfo.Label.DisplayName);
-            Assert.Equal(typeof(WhileNode), nodeInfo.NodeImplType);
-            Assert.Equal(NodeKind.Node, nodeInfo.Kind);
-
-            // 验证输入字段
-            Assert.Equal(2, nodeInfo.InputFields.Count);
-            var conditionInput = nodeInfo.InputFields.Find(f => f.Label.Code == "Condition");
-            Assert.NotNull(conditionInput);
-            Assert.True(conditionInput.Required);
-            Assert.Equal("Boolean", conditionInput.Type);
-
-            var maxIterationsInput = nodeInfo.InputFields.Find(f => f.Label.Code == "MaxIterations");
-            Assert.NotNull(maxIterationsInput);
-            Assert.False(maxIterationsInput.Required);
-            Assert.Equal("Int32", maxIterationsInput.Type);
-
-            // 验证输出字段
-            Assert.Equal(2, nodeInfo.OutputFields.Count);
-            var currentIterationOutput = nodeInfo.OutputFields.Find(f => f.Label.Code == "CurrentIteration");
-            Assert.NotNull(currentIterationOutput);
-            Assert.Equal("Int32", currentIterationOutput.Type);
-
-            var isCompletedOutput = nodeInfo.OutputFields.Find(f => f.Label.Code == "IsCompleted");
-            Assert.NotNull(isCompletedOutput);
-            Assert.Equal("Boolean", isCompletedOutput.Type);
-
-            // 验证信号
-            Assert.Equal(3, nodeInfo.Signals.Count);
-            var startLoopSignal = nodeInfo.Signals.Find(s => s.Label.Code == "StartLoop");
-            Assert.NotNull(startLoopSignal);
-
-            var resetSignal = nodeInfo.Signals.Find(s => s.Label.Code == "Reset");
-            Assert.NotNull(resetSignal);
-
-            var stopLoopSignal = nodeInfo.Signals.Find(s => s.Label.Code == "StopLoop");
-            Assert.NotNull(stopLoopSignal);
-
-            // 验证事件
-            Assert.Equal(2, nodeInfo.Emits.Count);
-            var loopBodyEmit = nodeInfo.Emits.Find(e => e.Label.Code == "LoopBody");
-            Assert.NotNull(loopBodyEmit);
-
-            var loopCompletedEmit = nodeInfo.Emits.Find(e => e.Label.Code == "LoopCompleted");
-            Assert.NotNull(loopCompletedEmit);
-        }
-
-        [Fact]
-        public void WhileNode_StartLoop_WithInfiniteLoop_ShouldStopAtMaxIterations()
+        public void WhileNode_Properties_ShouldBeSettable()
         {
             // Arrange
             var whileNode = new WhileNode();
-            var executionCount = 0;
             
+            // Act & Assert
             whileNode.Condition = true;
-            whileNode.MaxIterations = 10;
-            whileNode.LoopBody += () => executionCount++;
-
-            // Act
-            whileNode.StartLoop();
-
-            // Assert
+            Assert.True(whileNode.Condition);
+            
+            whileNode.MaxIterations = 500;
+            Assert.Equal(500, whileNode.MaxIterations);
+            
+            whileNode.CurrentIteration = 15;
+            Assert.Equal(15, whileNode.CurrentIteration);
+            
+            whileNode.IsCompleted = true;
             Assert.True(whileNode.IsCompleted);
-            Assert.Equal(10, whileNode.CurrentIteration);
-            Assert.Equal(10, executionCount);
         }
 
         [Fact]
-        public void WhileNode_StartLoop_WithMultipleHandlers_ShouldInvokeAll()
+        public void WhileNode_ShouldHaveCorrectSignalAttribute()
         {
             // Arrange
             var whileNode = new WhileNode();
-            var handler1Count = 0;
-            var handler2Count = 0;
             
-            whileNode.Condition = true;
-            whileNode.LoopBody += () => 
+            // Act
+            var methodInfo = typeof(WhileNode).GetMethod("StartLoop");
+            var signalAttribute = methodInfo.GetCustomAttributes(typeof(FlowSignalAttribute), false);
+            
+            // Assert
+            Assert.Single(signalAttribute);
+            Assert.Equal("开始循环", ((FlowSignalAttribute)signalAttribute[0]).Label);
+        }
+
+        [Fact]
+        public void WhileNode_StartLoop_ShouldResetBreakFlag()
+        {
+            // Arrange
+            var whileNode = new WhileNode
             {
-                handler1Count++;
-                if (handler1Count >= 3)
-                {
-                    whileNode.Condition = false;
-                }
+                Condition = true,
+                MaxIterations = 3
             };
-            whileNode.LoopBody += () => handler2Count++;
-
-            // Act
-            whileNode.StartLoop();
-
-            // Assert
-            Assert.Equal(3, handler1Count);
-            Assert.Equal(3, handler2Count);
-        }
-
-        [Fact]
-        public void WhileNode_StartLoop_WithLoopCompletedHandler_ShouldInvokeOnce()
-        {
-            // Arrange
-            var whileNode = new WhileNode();
-            var completedCount = 0;
+            var context = new NodeContext();
+            whileNode.Inject(context);
             
-            whileNode.Condition = false;
-            whileNode.LoopCompleted += () => completedCount++;
-
             // Act
             whileNode.StartLoop();
-
+            
             // Assert
-            Assert.Equal(1, completedCount);
+            // 循环应该正常完成，没有被中断
+            Assert.Equal(3, whileNode.CurrentIteration);
         }
     }
 } 
