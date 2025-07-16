@@ -6,6 +6,7 @@ using System.Text;
 
 namespace JstFlow.External.Expressions
 {
+    [FlowExpr("变量")]
     public class VariableExpression<T> : FlowExpression<T>
     {
         [FlowInput("值")]

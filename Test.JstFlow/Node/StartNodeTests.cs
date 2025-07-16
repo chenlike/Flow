@@ -42,7 +42,7 @@ namespace Test.JstFlow.Node
             startNode.Inject(context);
             
             // Act
-            var result = startNode.StartLoop();
+            var result = startNode.Execute();
             
             // Assert
             Assert.NotNull(result);
@@ -58,7 +58,7 @@ namespace Test.JstFlow.Node
             startNode.Inject(context);
             
             // Act
-            var result = startNode.StartLoop();
+            var result = startNode.Execute();
             
             // Assert
             Assert.NotNull(result.Expression);

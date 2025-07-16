@@ -16,7 +16,7 @@ namespace JstFlow.External
         public FlowEndpoint Start { get; set; }
 
         [FlowSignal("开始循环")]
-        public FlowOutEvent StartLoop()
+        public FlowOutEvent Execute()
         {
             return MoveNext(()=>Start);
         }
