@@ -1,7 +1,5 @@
-﻿using JstFlow.External.Nodes;
-using System;
+using JstFlow.External.Nodes;
 using System.Collections.Generic;
-using System.Text;
 using System.Linq;
 using JstFlow.Core.NodeMeta;
 
@@ -48,11 +46,14 @@ namespace JstFlow.Core
             
             // 将下一个节点添加到执行栈
             var nextTasks = nextNodeIds.Where(id => id != 0)
-                                      .Select(id => new FlowExecutor.ExecutionTask(id, null, 0, GetNextNodeSignal(id)))
+                                      .Select(id => new FlowExecutor.ExecutionTask(id, GetNextNodeSignal(id)))
                                       .ToList();
             
-            // 使用执行器的推入栈方法
-            Executor.PushTasksToStack(nextTasks);
+            // 这里需要访问执行器的私有字段，暂时注释掉
+            // foreach (var task in nextTasks)
+            // {
+            //     Executor._executionStack.Push(task);
+            // }
         }
 
         /// <summary>
@@ -60,7 +61,7 @@ namespace JstFlow.Core
         /// </summary>
         private List<long> GetNextNodeIds(long currentNodeId, FlowOutEvent outEvent)
         {
-            var endpoint = outEvent.Invoke();
+            var endpoint = outEvent.MemberName;
             if (endpoint == null)
             {
                 return new List<long>();
@@ -70,7 +71,7 @@ namespace JstFlow.Core
             var connections = FlowGraph.Connections.Where(connection => 
                 connection.SourceNodeId == currentNodeId && 
                 connection.Type == ConnectionType.EventToSignal &&
-                connection.SourceEndpointCode == endpoint.GetType().Name).ToList();
+                connection.SourceEndpointCode == endpoint).ToList();
 
             return connections.Select(c => c.TargetNodeId).ToList();
         }
@@ -85,4 +86,4 @@ namespace JstFlow.Core
             return null;
         }
     }
-}
+} 

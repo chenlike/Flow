@@ -162,11 +162,9 @@ namespace JstFlow.Core
         private static bool IsValidSignalReturnType(Type returnType)
         {
             return returnType == typeof(void) ||
-                   returnType == typeof(Task) ||
                    returnType == typeof(FlowOutEvent) ||
                    returnType == typeof(IEnumerator<FlowOutEvent>) ||
-                   returnType == typeof(IAsyncEnumerator<FlowOutEvent>) ||
-                   returnType == typeof(IAsyncEnumerable<FlowOutEvent>);
+                   returnType == typeof(IEnumerable<FlowOutEvent>);
         }
 
         private static Label CreateLabel(string name, string displayName)
@@ -174,4 +172,5 @@ namespace JstFlow.Core
             return new Label(name, string.IsNullOrWhiteSpace(displayName) ? name : displayName);
         }
     }
+
 }

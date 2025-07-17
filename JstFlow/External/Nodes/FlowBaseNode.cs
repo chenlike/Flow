@@ -11,31 +11,31 @@ namespace JstFlow.External.Nodes
 
     public class FlowOutEvent
     {
-        public Expression<Func<FlowEndpoint>> Expression { get; }
+        public string MemberName { get; }
 
-        private FlowOutEvent(Expression<Func<FlowEndpoint>> expression)
+        private FlowOutEvent(string memberName)
         {
-            Expression = expression;
+            MemberName = memberName;
         }
 
         public static FlowOutEvent Of(Expression<Func<FlowEndpoint>> expression)
         {
-            return new FlowOutEvent(expression);
+            var memberName = GetMemberName(expression);
+            if (memberName == null)
+            {
+                throw new ArgumentException("无效的表达式，无法提取成员名称");
+            }
+
+            return new FlowOutEvent(memberName);
         }
 
-        public FlowEndpoint Invoke() => Expression.Compile().Invoke();
-
-        public FlowEventAttribute GetLabelAttribute()
-        {
-            var memberInfo = GetMemberInfo(Expression);
-            return memberInfo?.GetCustomAttribute<FlowEventAttribute>();
-        }
-
-        private static MemberInfo GetMemberInfo(Expression expression)
+        private static string GetMemberName(Expression expression)
         {
             if (expression is LambdaExpression lambda &&
                 lambda.Body is MemberExpression memberExpr)
-                return memberExpr.Member;
+            {
+                return memberExpr.Member.Name;
+            }
             return null;
         }
     }
