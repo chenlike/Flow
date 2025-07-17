@@ -1,4 +1,4 @@
-# JstFlow
+# Flow
 
 > WIP
 

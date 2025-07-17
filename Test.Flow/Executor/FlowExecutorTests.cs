@@ -1,16 +1,24 @@
-﻿using Flow.Core;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Flow.Core;
 using Flow.Core.NodeMeta;
 using Flow.External;
+using Flow.External.Expressions;
 using Flow.External.Nodes;
-using System;
-using System.Collections.Generic;
+using Xunit;
 
-namespace Flow.ConsoleTest
+namespace Test.Flow.Executor
 {
-    internal class Program
+    public class FlowExecutorTests
     {
-        static void Main(string[] args)
+
+        [Fact]
+        public void Test()
         {
+
             var startNode = FlowNodeBuilder.Build<StartNode>();
 
             FlowNodeInfo forNode = FlowNodeBuilder.For<ForNode>()
@@ -40,23 +48,31 @@ namespace Flow.ConsoleTest
             };
 
 
-            var graphRes = FlowGraph.Create(new List<FlowNodeInfo>() { startNode, forNode, debugNode, overDebugNode }, connections);
-            if (graphRes.IsSuccess == false)
-            {
-                Console.WriteLine("创建流程图失败:" + graphRes.Message);
-            }
+            var graphRes = FlowGraph.Create(new List<FlowNodeInfo>() { startNode,forNode, debugNode, overDebugNode }, connections);
+            Assert.True(graphRes.IsSuccess, "创建流程图失败:" + graphRes.Message);
+
             var executor = FlowExecutor.Create(graphRes.Data);
             executor.Start();
+            executor.StepNext();
+            executor.StepNext();
+            executor.StepNext();
+            executor.StepNext();
+            executor.StepNext();
+            executor.StepNext();
+            executor.StepNext();
 
-            int step = 0;
-            while (executor.StepNext())
-            {
-                Console.WriteLine($"[{step}]---------");
+            System.Console.WriteLine();
 
-                step++;
-            }
 
-            System.Console.WriteLine("------全部结束---------");
+
+
+
         }
+
+
+
+
+
+
     }
 }

@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\JstFlow\JstFlow.csproj" />
+    <ProjectReference Include="..\Flow\Flow.csproj" />
   </ItemGroup>
 
 </Project>
