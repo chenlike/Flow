@@ -36,7 +36,6 @@
     <Folder Include="Node\" />
     <Folder Include="Expression\" />
     <Folder Include="Graph\" />
-    <Folder Include="Executor\" />
   </ItemGroup>
 
 </Project>

@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using JstFlow.Common;
+using System.Linq.Expressions;
+using JstFlow.External.Nodes;
 
 namespace JstFlow.Core
 {
@@ -57,28 +59,66 @@ namespace JstFlow.Core
         /// </summary>
         public string TargetEndpointCode { get; set; }
 
-        /// <summary>
-        /// 获取连接的描述信息
-        /// </summary>
-        public string GetDescription()
+
+
+        public static FlowConnection EventToSignal<TSourceNode, TTargetNode>(
+            long sourceNodeId,
+            long targetNodeId, 
+            Expression<Func<TSourceNode, object>> sourceExpression,
+            Expression<Func<TTargetNode, Func<object>>> targetExpression
+        ) where TSourceNode : FlowBaseNode
+        where TTargetNode : FlowBaseNode
         {
-            switch (Type)
+            // 从源表达式中提取事件名称
+            var sourceMemberName = GetMemberName(sourceExpression);
+            if (string.IsNullOrEmpty(sourceMemberName))
             {
-                case ConnectionType.OutputToInput:
-                    return $"输出字段 '{SourceEndpointCode}' -> 输入字段 '{TargetEndpointCode}'";
-                case ConnectionType.EventToSignal:
-                    return $"事件 '{SourceEndpointCode}' -> 信号 '{TargetEndpointCode}'";
-                default:
-                    return $"未知连接类型: {Type}";
+                throw new ArgumentException("无效的源表达式，无法提取事件名称");
             }
+
+            // 从目标表达式中提取信号名称
+            var targetMemberName = GetMemberName(targetExpression);
+            if (string.IsNullOrEmpty(targetMemberName))
+            {
+                throw new ArgumentException("无效的目标表达式，无法提取信号名称");
+            }
+
+            return new FlowConnection
+            {
+                Type = ConnectionType.EventToSignal,
+                SourceNodeId = sourceNodeId,
+                TargetNodeId = targetNodeId,
+                SourceEndpointCode = sourceMemberName,
+                TargetEndpointCode = targetMemberName
+            };
         }
 
         /// <summary>
-        /// 获取完整的连接描述（包含节点信息）
+        /// 从表达式中提取成员名称
         /// </summary>
-        public string GetFullDescription()
+        private static string GetMemberName<T>(Expression<Func<T, object>> expression)
         {
-            return $"节点 {SourceNodeId} 的 {GetDescription()} -> 节点 {TargetNodeId}";
+            if (expression is LambdaExpression lambda &&
+                lambda.Body is MemberExpression memberExpr)
+            {
+                return memberExpr.Member.Name;
+            }
+            return null;
         }
+
+        /// <summary>
+        /// 从函数表达式中提取成员名称
+        /// </summary>
+        private static string GetMemberName<T>(Expression<Func<T, Func<object>>> expression)
+        {
+            if (expression is LambdaExpression lambda &&
+                lambda.Body is MemberExpression memberExpr)
+            {
+                return memberExpr.Member.Name;
+            }
+            return null;
+        }
+
+
     }
-} 
+}

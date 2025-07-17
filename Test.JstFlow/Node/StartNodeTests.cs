@@ -34,12 +34,10 @@ namespace Test.JstFlow.Node
         }
 
         [Fact]
-        public void StartNode_StartLoop_ShouldReturnFlowOutEvent()
+        public void StartNode_Execute_ShouldReturnFlowOutEvent()
         {
             // Arrange
             var startNode = new StartNode();
-            var context = new NodeContext();
-            startNode.Inject(context);
             
             // Act
             var result = startNode.Execute();
@@ -50,20 +48,16 @@ namespace Test.JstFlow.Node
         }
 
         [Fact]
-        public void StartNode_StartLoop_ShouldReturnCorrectExpression()
+        public void StartNode_Execute_ShouldReturnCorrectMemberName()
         {
             // Arrange
             var startNode = new StartNode();
-            var context = new NodeContext();
-            startNode.Inject(context);
             
             // Act
             var result = startNode.Execute();
             
             // Assert
-            Assert.NotNull(result.Expression);
-            var compiledExpression = result.Expression.Compile();
-            Assert.Equal(startNode.Start, compiledExpression());
+            Assert.Equal("Start", result.MemberName);
         }
 
         [Fact]

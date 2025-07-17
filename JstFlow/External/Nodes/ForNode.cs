@@ -20,23 +20,21 @@ namespace JstFlow.External
         [FlowInput("步长")]
         public int Step { get; set; } = 1;
 
-        [FlowInput("中断条件")]
-        public bool BreakCondition { get; set; }
-
         [FlowOutput("当前索引")]
         public int CurrentIndex { get; set; }
 
         [FlowOutput("是否完成")]
         public bool IsCompleted { get; set; }
 
-        [FlowOutput("是否被中断")]
-        public bool IsBreak { get; set; }
-
         [FlowEvent("循环体")]
         public FlowEndpoint LoopBody { get; set; }
 
         [FlowEvent("循环完成")]
         public FlowEndpoint LoopCompleted { get; set; }
+
+
+
+        private bool _isBreak { get; set; }
 
 
         [FlowSignal("开始循环")]
@@ -48,7 +46,7 @@ namespace JstFlow.External
             for (CurrentIndex = Start; CurrentIndex <= End; CurrentIndex += Step)
             {
                 yield return Emit(()=>LoopBody);
-                if(BreakCondition)
+                if(_isBreak)
                 {
                     break;
                 }
@@ -63,15 +61,13 @@ namespace JstFlow.External
         {
             CurrentIndex = Start;
             IsCompleted = false;
-            IsBreak = false;
-            BreakCondition = false;
+            _isBreak = false;
         }
 
         [FlowSignal("中断循环")]
         public void Break()
         {
-            BreakCondition = true;
-            IsBreak = true;
+            _isBreak = true;
         }
 
     }

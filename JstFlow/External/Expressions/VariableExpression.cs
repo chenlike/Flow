@@ -9,6 +9,11 @@ namespace JstFlow.External.Expressions
     [FlowExpr("变量")]
     public class VariableExpression<T> : FlowExpression<T>
     {
+        public VariableExpression(T value)
+        {
+            Value = value;
+        }
+
         [FlowInput("值")]
         public T Value { get; set; }
 

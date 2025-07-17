@@ -16,6 +16,14 @@ namespace JstFlow.Core
 {
     public class FlowNodeBuilder
     {
+        public static FlowNodeInfo Build<TType>() where TType:FlowBaseNode{
+            var res = Build(typeof(TType));
+            if(res.IsFailure)
+            {
+                throw new Exception(res.Message);
+            }
+            return res.Data;
+        }
         public static Res<FlowNodeInfo> Build(Type nodeType)
         {
             if (nodeType == null)

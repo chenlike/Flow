@@ -43,8 +43,6 @@ namespace Test.JstFlow.Node
                 Start = 1,
                 End = 3
             };
-            var context = new NodeContext();
-            forNode.Inject(context);
             
             // Act
             var result = forNode.StartLoop();
@@ -63,8 +61,6 @@ namespace Test.JstFlow.Node
                 Start = 1,
                 End = 3
             };
-            var context = new NodeContext();
-            forNode.Inject(context);
             
             // Act
             var events = forNode.StartLoop().ToList();
@@ -73,7 +69,7 @@ namespace Test.JstFlow.Node
             // 循环结束后 CurrentIndex 应该是 End + Step
             Assert.Equal(4, forNode.CurrentIndex);
             Assert.False(forNode.IsCompleted);
-            Assert.False(forNode.IsBreak);
+            
         }
 
         [Theory]
@@ -89,8 +85,6 @@ namespace Test.JstFlow.Node
                 End = end,
                 Step = step
             };
-            var context = new NodeContext();
-            forNode.Inject(context);
             
             // Act
             var events = forNode.StartLoop().ToList();
@@ -108,8 +102,6 @@ namespace Test.JstFlow.Node
                 Start = 1,
                 End = 3
             };
-            var context = new NodeContext();
-            forNode.Inject(context);
             
             // Act
             var events = forNode.StartLoop().ToList();
@@ -120,7 +112,7 @@ namespace Test.JstFlow.Node
         }
 
         [Fact]
-        public void ForNode_StartLoop_ShouldReturnCorrectExpression()
+        public void ForNode_StartLoop_ShouldReturnCorrectMemberName()
         {
             // Arrange
             var forNode = new ForNode
@@ -128,8 +120,6 @@ namespace Test.JstFlow.Node
                 Start = 1,
                 End = 3
             };
-            var context = new NodeContext();
-            forNode.Inject(context);
             
             // Act
             var events = forNode.StartLoop().ToList();
@@ -140,9 +130,7 @@ namespace Test.JstFlow.Node
             
             // 最后一个事件应该是循环完成事件
             var lastEvent = events.Last();
-            Assert.NotNull(lastEvent.Expression);
-            var compiledExpression = lastEvent.Expression.Compile();
-            Assert.Equal(forNode.LoopCompleted, compiledExpression());
+            Assert.Equal("LoopCompleted", lastEvent.MemberName);
         }
 
         [Fact]
@@ -155,8 +143,6 @@ namespace Test.JstFlow.Node
                 End = 3,
                 CurrentIndex = 5,
                 IsCompleted = true,
-                IsBreak = true,
-                BreakCondition = true
             };
             
             // Act
@@ -165,46 +151,10 @@ namespace Test.JstFlow.Node
             // Assert
             Assert.Equal(1, forNode.CurrentIndex);
             Assert.False(forNode.IsCompleted);
-            Assert.False(forNode.IsBreak);
-            Assert.False(forNode.BreakCondition);
+            
         }
 
-        [Fact]
-        public void ForNode_Break_ShouldSetBreakCondition()
-        {
-            // Arrange
-            var forNode = new ForNode();
-            
-            // Act
-            forNode.Break();
-            
-            // Assert
-            Assert.True(forNode.BreakCondition);
-            Assert.True(forNode.IsBreak);
-        }
 
-        [Fact]
-        public void ForNode_StartLoop_WithBreakCondition_ShouldBreakEarly()
-        {
-            // Arrange
-            var forNode = new ForNode
-            {
-                Start = 1,
-                End = 5,
-                BreakCondition = true
-            };
-            var context = new NodeContext();
-            forNode.Inject(context);
-            
-            // Act
-            var events = forNode.StartLoop().ToList();
-            
-            // Assert
-            Assert.Equal(6, forNode.CurrentIndex); // 循环结束后 CurrentIndex = End + Step
-            // 注意：当 BreakCondition 为 true 时，循环会中断，但 IsBreak 不会被设置为 true
-            // 因为 IsBreak 只在调用 Break() 方法时设置
-            Assert.False(forNode.IsBreak);
-        }
 
         [Fact]
         public void ForNode_Properties_ShouldBeSettable()
@@ -221,18 +171,14 @@ namespace Test.JstFlow.Node
             
             forNode.Step = 5;
             Assert.Equal(5, forNode.Step);
-            
-            forNode.BreakCondition = true;
-            Assert.True(forNode.BreakCondition);
+
             
             forNode.CurrentIndex = 15;
             Assert.Equal(15, forNode.CurrentIndex);
             
             forNode.IsCompleted = true;
             Assert.True(forNode.IsCompleted);
-            
-            forNode.IsBreak = true;
-            Assert.True(forNode.IsBreak);
+
         }
 
         [Fact]
@@ -259,8 +205,6 @@ namespace Test.JstFlow.Node
                 Start = 1,
                 End = 3
             };
-            var context = new NodeContext();
-            forNode.Inject(context);
             
             // Act
             var events = forNode.StartLoop().ToList();
@@ -270,9 +214,7 @@ namespace Test.JstFlow.Node
             for (int i = 0; i < 3; i++)
             {
                 var loopBodyEvent = events[i];
-                Assert.NotNull(loopBodyEvent.Expression);
-                var compiledExpression = loopBodyEvent.Expression.Compile();
-                Assert.Equal(forNode.LoopBody, compiledExpression());
+                Assert.Equal("LoopBody", loopBodyEvent.MemberName);
             }
         }
 
@@ -285,8 +227,6 @@ namespace Test.JstFlow.Node
                 Start = 1,
                 End = 3
             };
-            var context = new NodeContext();
-            forNode.Inject(context);
             
             // Act
             var events = forNode.StartLoop().ToList();
@@ -294,9 +234,7 @@ namespace Test.JstFlow.Node
             // Assert
             // 最后一个事件应该是循环完成事件
             var completedEvent = events.Last();
-            Assert.NotNull(completedEvent.Expression);
-            var compiledExpression = completedEvent.Expression.Compile();
-            Assert.Equal(forNode.LoopCompleted, compiledExpression());
+            Assert.Equal("LoopCompleted", completedEvent.MemberName);
         }
     }
 } 

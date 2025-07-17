@@ -42,8 +42,6 @@ namespace Test.JstFlow.Node
             {
                 Condition = true
             };
-            var context = new NodeContext();
-            whileNode.Inject(context);
             
             // Act
             var result = whileNode.StartLoop();
@@ -54,15 +52,13 @@ namespace Test.JstFlow.Node
         }
 
         [Fact]
-        public void WhileNode_StartLoop_ShouldReturnCorrectExpression()
+        public void WhileNode_StartLoop_ShouldReturnCorrectMemberName()
         {
             // Arrange
             var whileNode = new WhileNode
             {
                 Condition = true
             };
-            var context = new NodeContext();
-            whileNode.Inject(context);
             
             // Act
             var events = whileNode.StartLoop().ToList();
@@ -73,9 +69,7 @@ namespace Test.JstFlow.Node
             
             // 最后一个事件应该是循环完成事件
             var lastEvent = events.Last();
-            Assert.NotNull(lastEvent.Expression);
-            var compiledExpression = lastEvent.Expression.Compile();
-            Assert.Equal(whileNode.LoopCompleted, compiledExpression());
+            Assert.Equal("LoopCompleted", lastEvent.MemberName);
         }
 
         [Theory]
@@ -88,8 +82,6 @@ namespace Test.JstFlow.Node
             {
                 Condition = condition
             };
-            var context = new NodeContext();
-            whileNode.Inject(context);
             
             // Act
             var events = whileNode.StartLoop().ToList();
@@ -107,8 +99,6 @@ namespace Test.JstFlow.Node
                 Condition = true,
                 MaxIterations = 5
             };
-            var context = new NodeContext();
-            whileNode.Inject(context);
             
             // Act
             var events = whileNode.StartLoop().ToList();
@@ -126,8 +116,6 @@ namespace Test.JstFlow.Node
                 Condition = true,
                 MaxIterations = 3
             };
-            var context = new NodeContext();
-            whileNode.Inject(context);
             
             // Act
             var events = whileNode.StartLoop().ToList();
@@ -146,8 +134,6 @@ namespace Test.JstFlow.Node
                 Condition = true,
                 MaxIterations = 3
             };
-            var context = new NodeContext();
-            whileNode.Inject(context);
             
             // Act
             var events = whileNode.StartLoop().ToList();
@@ -157,9 +143,7 @@ namespace Test.JstFlow.Node
             for (int i = 0; i < 3; i++)
             {
                 var loopBodyEvent = events[i];
-                Assert.NotNull(loopBodyEvent.Expression);
-                var compiledExpression = loopBodyEvent.Expression.Compile();
-                Assert.Equal(whileNode.LoopBody, compiledExpression());
+                Assert.Equal("LoopBody", loopBodyEvent.MemberName);
             }
         }
 
@@ -172,8 +156,6 @@ namespace Test.JstFlow.Node
                 Condition = true,
                 MaxIterations = 3
             };
-            var context = new NodeContext();
-            whileNode.Inject(context);
             
             // Act
             var events = whileNode.StartLoop().ToList();
@@ -181,9 +163,7 @@ namespace Test.JstFlow.Node
             // Assert
             // 最后一个事件应该是循环完成事件
             var completedEvent = events.Last();
-            Assert.NotNull(completedEvent.Expression);
-            var compiledExpression = completedEvent.Expression.Compile();
-            Assert.Equal(whileNode.LoopCompleted, compiledExpression());
+            Assert.Equal("LoopCompleted", completedEvent.MemberName);
         }
 
         [Fact]
@@ -213,8 +193,6 @@ namespace Test.JstFlow.Node
                 Condition = true,
                 MaxIterations = 10
             };
-            var context = new NodeContext();
-            whileNode.Inject(context);
             
             // Act
             whileNode.Break();
@@ -268,8 +246,6 @@ namespace Test.JstFlow.Node
                 Condition = true,
                 MaxIterations = 3
             };
-            var context = new NodeContext();
-            whileNode.Inject(context);
             
             // Act
             var events = whileNode.StartLoop().ToList();
@@ -287,8 +263,6 @@ namespace Test.JstFlow.Node
             {
                 Condition = false
             };
-            var context = new NodeContext();
-            whileNode.Inject(context);
             
             // Act
             var events = whileNode.StartLoop().ToList();
@@ -297,9 +271,7 @@ namespace Test.JstFlow.Node
             // 条件为假时，应该只有一个完成事件
             Assert.Single(events);
             var completedEvent = events.First();
-            Assert.NotNull(completedEvent.Expression);
-            var compiledExpression = completedEvent.Expression.Compile();
-            Assert.Equal(whileNode.LoopCompleted, compiledExpression());
+            Assert.Equal("LoopCompleted", completedEvent.MemberName);
         }
     }
 } 

@@ -44,8 +44,6 @@ namespace Test.JstFlow.Node
             {
                 Condition = condition
             };
-            var context = new NodeContext();
-            ifElseNode.Inject(context);
             
             // Act
             var result = ifElseNode.Execute();
@@ -54,9 +52,8 @@ namespace Test.JstFlow.Node
             Assert.NotNull(result);
             Assert.IsType<FlowOutEvent>(result);
             
-            var compiledExpression = result.Expression.Compile();
-            var expectedEndpoint = condition ? ifElseNode.TrueBranch : ifElseNode.FalseBranch;
-            Assert.Equal(expectedEndpoint, compiledExpression());
+            var expectedMemberName = condition ? "TrueBranch" : "FalseBranch";
+            Assert.Equal(expectedMemberName, result.MemberName);
         }
 
         [Fact]
@@ -67,15 +64,12 @@ namespace Test.JstFlow.Node
             {
                 Condition = true
             };
-            var context = new NodeContext();
-            ifElseNode.Inject(context);
             
             // Act
             var result = ifElseNode.Execute();
             
             // Assert
-            var compiledExpression = result.Expression.Compile();
-            Assert.Equal(ifElseNode.TrueBranch, compiledExpression());
+            Assert.Equal("TrueBranch", result.MemberName);
         }
 
         [Fact]
@@ -86,15 +80,12 @@ namespace Test.JstFlow.Node
             {
                 Condition = false
             };
-            var context = new NodeContext();
-            ifElseNode.Inject(context);
             
             // Act
             var result = ifElseNode.Execute();
             
             // Assert
-            var compiledExpression = result.Expression.Compile();
-            Assert.Equal(ifElseNode.FalseBranch, compiledExpression());
+            Assert.Equal("FalseBranch", result.MemberName);
         }
 
         [Fact]
