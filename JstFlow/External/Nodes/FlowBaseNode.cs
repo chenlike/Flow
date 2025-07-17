@@ -44,19 +44,6 @@ namespace JstFlow.External.Nodes
     public abstract class FlowBaseNode
     {
 
-        internal NodeContext _context;
-
-
-#if DEBUG
-        public void Inject(NodeContext context)
-#endif
-#if RELEASE
-        internal void Inject(NodeContext context)
-#endif
-        {
-            _context = context;
-        }
-
         public FlowOutEvent Emit(Expression<Func<FlowEndpoint>> expression)
         {
             return FlowOutEvent.Of(expression);

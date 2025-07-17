@@ -126,7 +126,6 @@ namespace JstFlow.Core
         {
             var nodeInfo = _nodes[task.NodeId];
             var instance = GetInstance(nodeInfo);
-            InjectContext(instance, task.NodeId);
             SetInputs(instance, _inputs[task.NodeId]);
 
             // 表达式节点不产生任务
@@ -245,16 +244,21 @@ namespace JstFlow.Core
 
         private object ExecuteExpression(long exprId)
         {
-            // 表达式是无副作用的，可以缓存结果
-            if (_expressionResults.ContainsKey(exprId))
-            {
-                return _expressionResults[exprId];
-            }
+
+            if (_expressionResults.TryGetValue(exprId, out var cached))
+                return cached;
+
 
             var info = _nodes[exprId];
-            dynamic inst = Activator.CreateInstance(info.NodeImplType);
-            var result = inst.Evaluate();
-            // 缓存结果
+
+            var instance = Activator.CreateInstance(info.NodeImplType);
+            if (!(instance is FlowExpression<object> exprObj))
+            {
+                throw new InvalidOperationException($"节点 {exprId} 不是 FlowExpression<>");
+            }
+
+            var result = exprObj.Evaluate();
+
             _expressionResults[exprId] = result;
             return result;
         }
@@ -270,15 +274,24 @@ namespace JstFlow.Core
                 ? null
                 : node.Signals.FirstOrDefault(s => s.Label.Code == code);
 
-        private object GetInstance(FlowNodeInfo node){
-            if(_instances.ContainsKey(node.Id)){
+        private object GetInstance(FlowNodeInfo node)
+        {
+            if (_instances.ContainsKey(node.Id))
+            {
                 return _instances[node.Id];
             }
-            var instance = Activator.CreateInstance(node.NodeImplType);
+            var instance = CreateInstance(node.NodeImplType);
             _instances[node.Id] = instance;
             return instance;
         }
-            
+
+
+
+        private object CreateInstance(Type type)
+        {
+            var instance = Activator.CreateInstance(type);
+            return instance;
+        }
 
         private void SetInputs(object instance, Dictionary<string, object> inputs)
         {
@@ -293,19 +306,6 @@ namespace JstFlow.Core
             }
         }
 
-        private void InjectContext(object instance, long nodeId)
-        {
-            if (instance is FlowBaseNode bn)
-            {
-                bn.Inject(new NodeContext
-                {
-                    Executor = this,
-                    FlowGraph = _graph,
-                    NodeMap = _nodes,
-                    CurrentNodeId = nodeId
-                });
-            }
-        }
     }
 
 }
