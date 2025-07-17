@@ -1,17 +1,14 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Text;
-using System.Reflection;
 using System.Linq;
+using JstFlow.Common;
+using JstFlow.Core;
 using JstFlow.Core.NodeMeta;
 using JstFlow.Core.Metas;
-using System.Threading.Tasks;
 using JstFlow.External;
-using JstFlow.Common;
-using JstFlow.External.Nodes;
 using JstFlow.External.Expressions;
-using static JstFlow.Core.FlowExecutor;
-using System.Collections;
+using JstFlow.External.Nodes;
 
 namespace JstFlow.Core
 {
@@ -30,9 +27,8 @@ namespace JstFlow.Core
     {
         public long NodeId { get; }
         public string TriggerSignal { get; }
-        public bool IsResume => false;
 
-        public SignalTask(long nodeId, string triggerSignal = null)
+        public SignalTask(long nodeId, string triggerSignal)
         {
             NodeId = nodeId;
             TriggerSignal = triggerSignal;
@@ -42,14 +38,12 @@ namespace JstFlow.Core
     /// <summary>
     /// 恢复枚举器任务
     /// </summary>
-    public class ResumeTask : IExecutionTask
+    public class ContinueEnumerator : IExecutionTask
     {
         public long NodeId { get; }
-        public string TriggerSignal => null;
-        public bool IsResume => true;
         public long EnumeratorId { get; }
 
-        public ResumeTask(long nodeId, long enumeratorId)
+        public ContinueEnumerator(long nodeId, long enumeratorId)
         {
             NodeId = nodeId;
             EnumeratorId = enumeratorId;
@@ -58,240 +52,239 @@ namespace JstFlow.Core
 
     /// <summary>
     /// 流程图执行器，负责执行 FlowGraph 中定义的节点和连接
-    /// 仅支持 .NET Standard 同步执行
+    /// 支持同步执行
     /// </summary>
     public class FlowExecutor
     {
-        private readonly FlowGraph _flowGraph;
-        private readonly Dictionary<long, FlowNodeInfo> _nodeMap;
-        private readonly Stack<IExecutionTask> _executionStack;
-        private readonly Dictionary<long, object> _nodeInstances;
-        private readonly Dictionary<long, IEnumerator<FlowOutEvent>> _activeEnumerators;
-        private readonly Dictionary<long, Dictionary<string, object>> _nodeInputValues;
+        private readonly FlowGraph _graph;
+        private readonly Dictionary<long, FlowNodeInfo> _nodes;
+        private readonly Stack<IExecutionTask> _stack = new Stack<IExecutionTask>();
+        private readonly Dictionary<long, object> _instances = new Dictionary<long, object>();
+        private readonly Dictionary<long, IEnumerator<FlowOutEvent>> _enumerators = new Dictionary<long, IEnumerator<FlowOutEvent>>();
+        private readonly Dictionary<long, Dictionary<string, object>> _inputs = new Dictionary<long, Dictionary<string, object>>();
+        private readonly Dictionary<long, Dictionary<string, object>> _outputs = new Dictionary<long, Dictionary<string, object>>();
+        private readonly Dictionary<long, object> _expressionResults = new Dictionary<long, object>();
+        private readonly Dictionary<(long, string), FlowConnection> _eventConnectionMap;
 
         public long CurrentNodeId { get; private set; }
-        public bool IsRunning { get; private set; }
-        public bool IsPaused { get; private set; }
+        public bool IsRunning => _stack.Count > 0;
 
         private FlowExecutor(FlowGraph graph)
         {
-            _flowGraph = graph;
-            _nodeMap = graph.Nodes.ToDictionary(n => n.Id);
-            _executionStack = new Stack<IExecutionTask>();
-            _nodeInstances = new Dictionary<long, object>();
-            _activeEnumerators = new Dictionary<long, IEnumerator<FlowOutEvent>>();
-            _nodeInputValues = new Dictionary<long, Dictionary<string, object>>();
+            _graph = graph;
+            _nodes = graph.Nodes.ToDictionary(n => n.Id);
+            // 初始化事件连接字典
+            _eventConnectionMap = graph.Connections
+                .Where(c => c.Type == ConnectionType.EventToSignal)
+                .ToDictionary(
+                    c => (c.SourceNodeId, c.SourceEndpointCode),
+                    c => c
+                );
         }
 
         public static FlowExecutor Create(FlowGraph graph)
         {
-            var validate = graph.ValidateGraph();
-            if (validate.IsFailure)
-                throw new InvalidOperationException(validate.Message);
-
+            var validation = graph.ValidateGraph();
+            if (validation.IsFailure)
+                throw new InvalidOperationException(validation.Message);
             return new FlowExecutor(graph);
         }
 
         public Res Start()
         {
-            var startNode = _flowGraph.Nodes.FirstOrDefault(n => n.Kind == NodeKind.StartNode);
-            if (startNode == null)
-            {
-                return Res.Fail("流程图没有启动节点");
-            }
-
-            _executionStack.Push(new SignalTask(startNode.Id, nameof(StartNode.Start)));
-
+            var startNode = _graph.Nodes.FirstOrDefault(n => n.Kind == NodeKind.StartNode)
+                            ?? throw new InvalidOperationException("流程图没有启动节点");
+            _stack.Push(new SignalTask(startNode.Id, nameof(StartNode.Start)));
             return Res.Ok();
         }
 
         public Res StepNext()
         {
-            if (_executionStack.Count == 0)
-            {
+            if (_stack.Count == 0)
                 return Res.Fail("没有可执行的节点");
-            }
 
-            var currentTask = _executionStack.Pop();
-            var node = _nodeMap[currentTask.NodeId];
+            var task = _stack.Pop();
+            CurrentNodeId = task.NodeId;
 
-            // 节点输入参数
-            var inputs = PrepareInputs(currentTask.NodeId);
-            _nodeInputValues[currentTask.NodeId] = inputs;
+            // 准备并缓存输入参数
+            _inputs[task.NodeId] = PrepareInputs(task.NodeId);
 
-            // 执行当前节点
-            var nextTasks = ExecuteNode(currentTask);
-
-            // 将下一个任务推入执行栈
-            foreach (var task in nextTasks)
+            // 执行并将后续任务压栈
+            foreach (var next in Execute(task))
             {
-                _executionStack.Push(task);
+                if (next != null)
+                    _stack.Push(next);
             }
+
+            // 准备并缓存输出参数
+            _outputs[task.NodeId] = SaveOutputs(task.NodeId);
 
             return Res.Ok();
         }
 
-        private List<IExecutionTask> ExecuteNode(IExecutionTask task)
+        private IEnumerable<IExecutionTask> Execute(IExecutionTask task)
         {
-            var node = _nodeMap[task.NodeId];
-            if (node.Kind == NodeKind.Expression)
-                return new List<IExecutionTask>();
-
-            var instance = GetOrCreateNodeInstance(node.Id);
+            var nodeInfo = _nodes[task.NodeId];
+            var instance = GetInstance(nodeInfo);
             InjectContext(instance, task.NodeId);
+            SetInputs(instance, _inputs[task.NodeId]);
 
-            _nodeInputValues.TryGetValue(task.NodeId, out var inputs);
-            if (inputs == null)
-                inputs = new Dictionary<string, object>();
-            SetInputs(instance, inputs);
+            // 表达式节点不产生任务
+            if (nodeInfo.Kind == NodeKind.Expression)
+                return Enumerable.Empty<IExecutionTask>();
 
-            var nextTasks = new List<IExecutionTask>();
-
-            // 使用 switch 语句处理不同的任务类型
-            switch (task)
+            if (task is ContinueEnumerator resume)
             {
-                case ResumeTask resumeTask:
-                    nextTasks.AddRange(ExecuteResume(resumeTask));
+                return ExecuteResume(resume);
+            }
+            else if (task is SignalTask signal)
+            {
+                var signalInfo = GetSignal(nodeInfo, signal.TriggerSignal);
+                return ExecuteSignal(instance, signalInfo, task.NodeId);
+            }
+            else
+            {
+                return Enumerable.Empty<IExecutionTask>();
+            }
+        }
+
+        private IEnumerable<IExecutionTask> ExecuteResume(ContinueEnumerator resume)
+        {
+            if (!_enumerators.ContainsKey(resume.EnumeratorId))
+                yield break;
+
+            var enumerator = _enumerators[resume.EnumeratorId];
+
+            if (enumerator.MoveNext())
+            {
+                // 继续恢复此枚举器 还没执行完
+                yield return new ContinueEnumerator(resume.NodeId, resume.EnumeratorId);
+                yield return CreateSignalTask(resume.NodeId, enumerator.Current);
+            }
+            else
+            {
+                _enumerators.Remove(resume.EnumeratorId);
+            }
+        }
+
+        private IEnumerable<IExecutionTask> ExecuteSignal(object instance, SignalInfo signal, long nodeId)
+        {
+            if (signal == null)
+                yield break;
+
+            var result = signal.MethodInfo.Invoke(instance, null);
+
+            switch (result)
+            {
+                case FlowOutEvent e:
+                    yield return CreateSignalTask(nodeId, e);
                     break;
-                case SignalTask signalTask:
-                    var signal = GetSignal(node.Id, signalTask.TriggerSignal);
-                    if (signal != null)
-                        nextTasks.AddRange(ExecuteSignal(instance, signal, inputs, task.NodeId));
+                case IEnumerable<FlowOutEvent> list:
+                    // 将 IEnumerable 转为 IEnumerator 统一处理
+                    var enList = list.GetEnumerator();
+                    if (enList.MoveNext())
+                    {
+                        var idList = Utils.GenId();
+                        _enumerators[idList] = enList;
+                        // 先入栈恢复任务，再生成信号任务
+                        yield return new ContinueEnumerator(nodeId, idList);
+                        yield return CreateSignalTask(nodeId, enList.Current);
+                    }
+                    break;
+                case IEnumerator<FlowOutEvent> en:
+                    if (en.MoveNext())
+                    {
+                        var id = Utils.GenId();
+                        _enumerators[id] = en;
+                        // 先入栈恢复任务，再生成信号任务
+                        yield return new ContinueEnumerator(nodeId, id);
+                        yield return CreateSignalTask(nodeId, en.Current);
+                    }
+                    break;
+                default:
+                    // void 或其他类型，无需处理
                     break;
             }
-
-            return nextTasks;
         }
 
-        private List<IExecutionTask> ExecuteResume(ResumeTask resumeTask)
+        private IExecutionTask CreateSignalTask(long nodeId, FlowOutEvent evt)
         {
-            var nextTasks = new List<IExecutionTask>();
-
-            if (_activeEnumerators.TryGetValue(resumeTask.EnumeratorId, out var enumerator))
+            if (evt == null)
+                return null;
+            // 用字典高效查找
+            if (_eventConnectionMap.TryGetValue((nodeId, evt.MemberName), out var conn))
             {
-                if (enumerator.MoveNext())
-                {
-                    var nextTask = GetSignalNextTask(resumeTask.NodeId, enumerator.Current);
-                    if (nextTask != null)
-                    {
-                        nextTasks.Add(nextTask);
-                    }
-                    // 继续恢复同一个枚举器
-                    nextTasks.Add(new ResumeTask(resumeTask.NodeId, resumeTask.EnumeratorId));
-                }
-                else
-                {
-                    _activeEnumerators.Remove(resumeTask.EnumeratorId); // 清理
-                }
+                return new SignalTask(conn.TargetNodeId, conn.TargetEndpointCode);
             }
-
-            return nextTasks;
+            return null;
         }
 
-        private List<IExecutionTask> ExecuteSignal(object instance, SignalInfo signal, Dictionary<string, object> inputs, long nodeId)
+        private Dictionary<string, object> PrepareInputs(long nodeId)
         {
-            var nextTasks = new List<IExecutionTask>();
-
-            // 根据返回值处理不同情况
-            if (signal.MethodInfo.ReturnType == typeof(void))
-            {
-                // 无返回值
-                signal.MethodInfo.Invoke(instance, null);
-            }
-            else if (signal.MethodInfo.ReturnType == typeof(FlowOutEvent))
-            {
-                // 单个事件
-                var outEvent = (FlowOutEvent)signal.MethodInfo.Invoke(instance, null);
-                var nextTask = GetSignalNextTask(nodeId, outEvent);
-                if (nextTask != null)
-                {
-                    nextTasks.Add(nextTask);
-                }
-            }
-            else if (signal.MethodInfo.ReturnType == typeof(IEnumerable<FlowOutEvent>))
-            {
-                // 多个事件
-                var enumable = (IEnumerable<FlowOutEvent>)signal.MethodInfo.Invoke(instance, null);
-                var enumerator = enumable.GetEnumerator();
-                if (enumerator.MoveNext())
-                {
-                    var genId = Utils.GenId();
-                    _activeEnumerators[genId] = enumerator;
-
-                    var nextTask = GetSignalNextTask(nodeId, enumerator.Current);
-                    if (nextTask != null)
-                    {
-                        nextTasks.Add(nextTask);
-                    }
-                    // 添加恢复任务
-                    nextTasks.Add(new ResumeTask(nodeId, genId));
-                }
-            }
-            else if (signal.MethodInfo.ReturnType == typeof(IEnumerator<FlowOutEvent>))
-            {
-                var enumerator = (IEnumerator<FlowOutEvent>)signal.MethodInfo.Invoke(instance, null);
-                if (enumerator.MoveNext())
-                {
-                    var genId = Utils.GenId();
-                    _activeEnumerators[genId] = enumerator;
-                    var nextTask = GetSignalNextTask(nodeId, enumerator.Current);
-                    if (nextTask != null)
-                    {
-                        nextTasks.Add(nextTask);
-                    }
-                    // 添加恢复任务
-                    nextTasks.Add(new ResumeTask(nodeId, genId));
-                }
-            }
-
-            return nextTasks;
+            return _graph.Connections
+                .Where(c => c.TargetNodeId == nodeId && c.Type == ConnectionType.OutputToInput)
+                .Select(c => new { c.TargetEndpointCode, Value = GetValue(c) })
+                .Where(x => x.Value != null)
+                .ToDictionary(x => x.TargetEndpointCode, x => x.Value);
         }
 
-        private IExecutionTask GetSignalNextTask(long nodeId, FlowOutEvent outEvent)
+        private Dictionary<string, object> SaveOutputs(long nodeId)
         {
-            if (outEvent == null) return null;
-            
-            // 获取事件对应的端点
-            var endpoint = outEvent.MemberName;
-            if (endpoint == null) return null;
-            
-            // 查找从当前节点出发的EventToSignal连接
-            var connections = _flowGraph.Connections
-                .Where(c => c.SourceNodeId == nodeId && 
-                           c.Type == ConnectionType.EventToSignal &&
-                           c.SourceEndpointCode == endpoint)
-                .ToList();
-            
-            // 如果没有找到连接，返回null
-            if (!connections.Any()) return null;
-            
-            // 获取第一个连接的目标节点和信号
-            var connection = connections.First();
-            var targetNodeId = connection.TargetNodeId;
-            var signalCode = connection.TargetEndpointCode;
-            
-            // 返回新的执行任务
-            return new SignalTask(targetNodeId, signalCode);
+            // 获取节点实例
+            var instance = GetInstance(_nodes[nodeId]);
+            // 获取节点输出
+            var outputs = _nodes[nodeId].OutputFields.ToDictionary(f => f.Label.Code, f => f.PropertyInfo.GetValue(instance));
+            // 返回输出
+            return outputs;
         }
 
-        private SignalInfo GetSignal(long nodeId, string triggerSignal)
+        private object GetValue(FlowConnection c)
+            => _nodes[c.SourceNodeId].Kind == NodeKind.Expression
+                ? ExecuteExpression(c.SourceNodeId)
+                : GetOutputValue(c.SourceNodeId, c.SourceEndpointCode);
+
+        private object ExecuteExpression(long exprId)
         {
-            var node = _nodeMap[nodeId];
-            SignalInfo signal = null;
-            if (!string.IsNullOrEmpty(triggerSignal))
+            // 表达式是无副作用的，可以缓存结果
+            if (_expressionResults.ContainsKey(exprId))
             {
-                signal = node.Signals.FirstOrDefault(s => s.Label.Code == triggerSignal);
+                return _expressionResults[exprId];
             }
-            return signal;
+
+            var info = _nodes[exprId];
+            dynamic inst = Activator.CreateInstance(info.NodeImplType);
+            var result = inst.Evaluate();
+            // 缓存结果
+            _expressionResults[exprId] = result;
+            return result;
         }
+
+        private object GetOutputValue(long nodeId, string code)
+        {
+            var field = _nodes[nodeId].OutputFields.FirstOrDefault(f => f.Label.Code == code);
+            return field?.PropertyInfo.GetValue(GetInstance(_nodes[nodeId]));
+        }
+
+        private SignalInfo GetSignal(FlowNodeInfo node, string code)
+            => string.IsNullOrEmpty(code)
+                ? null
+                : node.Signals.FirstOrDefault(s => s.Label.Code == code);
+
+        private object GetInstance(FlowNodeInfo node){
+            if(_instances.ContainsKey(node.Id)){
+                return _instances[node.Id];
+            }
+            var instance = Activator.CreateInstance(node.NodeImplType);
+            _instances[node.Id] = instance;
+            return instance;
+        }
+            
 
         private void SetInputs(object instance, Dictionary<string, object> inputs)
         {
-            if (inputs == null) return;
-            var props = instance.GetType().GetProperties();
             foreach (var kv in inputs)
             {
-                var prop = props.FirstOrDefault(p => p.Name == kv.Key);
+                var prop = instance.GetType().GetProperty(kv.Key);
                 if (prop != null && kv.Value != null)
                 {
                     try { prop.SetValue(instance, Convert.ChangeType(kv.Value, prop.PropertyType)); }
@@ -302,53 +295,17 @@ namespace JstFlow.Core
 
         private void InjectContext(object instance, long nodeId)
         {
-            if (instance is FlowBaseNode baseNode)
+            if (instance is FlowBaseNode bn)
             {
-                var ctx = new NodeContext { Executor = this, FlowGraph = _flowGraph, NodeMap = _nodeMap, CurrentNodeId = nodeId };
-                baseNode.Inject(ctx);
+                bn.Inject(new NodeContext
+                {
+                    Executor = this,
+                    FlowGraph = _graph,
+                    NodeMap = _nodes,
+                    CurrentNodeId = nodeId
+                });
             }
-        }
-
-        private object GetOrCreateNodeInstance(long nodeId)
-        {
-            if (!_nodeInstances.TryGetValue(nodeId, out var nodeInstance))
-            {
-                var node = _nodeMap[nodeId];
-                nodeInstance = Activator.CreateInstance(node.NodeImplType);
-                _nodeInstances[nodeId] = nodeInstance;
-            }
-            return nodeInstance;
-        }
-
-        private Dictionary<string, object> PrepareInputs(long nodeId)
-        {
-            var inputs = new Dictionary<string, object>();
-            var connections = _flowGraph.Connections
-                .Where(c => c.TargetNodeId == nodeId && c.Type == ConnectionType.OutputToInput);
-            foreach (var conn in connections)
-            {
-                object val = _nodeMap[conn.SourceNodeId].Kind == NodeKind.Expression
-                    ? ExecuteExpression(conn.SourceNodeId)
-                    : GetOutputValue(conn.SourceNodeId, conn.SourceEndpointCode);
-                if (val != null) inputs[conn.TargetEndpointCode] = val;
-            }
-            return inputs;
-        }
-
-        private object ExecuteExpression(long exprId)
-        {
-            var node = _nodeMap[exprId];
-            var inst = Activator.CreateInstance(node.NodeImplType);
-            var mi = inst.GetType().GetMethod(nameof(FlowExpression<object>.Evaluate));
-            return mi?.Invoke(inst, null);
-        }
-
-        private object GetOutputValue(long nodeId, string code)
-        {
-            var node = _nodeMap[nodeId];
-            var inst = GetOrCreateNodeInstance(nodeId);
-            var field = node.OutputFields.FirstOrDefault(f => f.Label.Code == code);
-            return field?.PropertyInfo.GetValue(inst);
         }
     }
+
 }
