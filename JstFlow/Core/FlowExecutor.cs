@@ -16,6 +16,47 @@ using System.Collections;
 namespace JstFlow.Core
 {
     /// <summary>
+    /// 执行任务接口，支持多种任务类型
+    /// </summary>
+    public interface IExecutionTask
+    {
+        long NodeId { get; }
+    }
+
+    /// <summary>
+    /// 普通信号驱动任务
+    /// </summary>
+    public class SignalTask : IExecutionTask
+    {
+        public long NodeId { get; }
+        public string TriggerSignal { get; }
+        public bool IsResume => false;
+
+        public SignalTask(long nodeId, string triggerSignal = null)
+        {
+            NodeId = nodeId;
+            TriggerSignal = triggerSignal;
+        }
+    }
+
+    /// <summary>
+    /// 恢复枚举器任务
+    /// </summary>
+    public class ResumeTask : IExecutionTask
+    {
+        public long NodeId { get; }
+        public string TriggerSignal => null;
+        public bool IsResume => true;
+        public long EnumeratorId { get; }
+
+        public ResumeTask(long nodeId, long enumeratorId)
+        {
+            NodeId = nodeId;
+            EnumeratorId = enumeratorId;
+        }
+    }
+
+    /// <summary>
     /// 流程图执行器，负责执行 FlowGraph 中定义的节点和连接
     /// 仅支持 .NET Standard 同步执行
     /// </summary>
@@ -23,7 +64,7 @@ namespace JstFlow.Core
     {
         private readonly FlowGraph _flowGraph;
         private readonly Dictionary<long, FlowNodeInfo> _nodeMap;
-        private readonly Stack<ExecutionTask> _executionStack;
+        private readonly Stack<IExecutionTask> _executionStack;
         private readonly Dictionary<long, object> _nodeInstances;
         private readonly Dictionary<long, IEnumerator<FlowOutEvent>> _activeEnumerators;
         private readonly Dictionary<long, Dictionary<string, object>> _nodeInputValues;
@@ -36,7 +77,7 @@ namespace JstFlow.Core
         {
             _flowGraph = graph;
             _nodeMap = graph.Nodes.ToDictionary(n => n.Id);
-            _executionStack = new Stack<ExecutionTask>();
+            _executionStack = new Stack<IExecutionTask>();
             _nodeInstances = new Dictionary<long, object>();
             _activeEnumerators = new Dictionary<long, IEnumerator<FlowOutEvent>>();
             _nodeInputValues = new Dictionary<long, Dictionary<string, object>>();
@@ -59,7 +100,7 @@ namespace JstFlow.Core
                 return Res.Fail("流程图没有启动节点");
             }
 
-            _executionStack.Push(new ExecutionTask(startNode.Id, nameof(StartNode.Start)));
+            _executionStack.Push(new SignalTask(startNode.Id, nameof(StartNode.Start)));
 
             return Res.Ok();
         }
@@ -90,11 +131,11 @@ namespace JstFlow.Core
             return Res.Ok();
         }
 
-        private List<ExecutionTask> ExecuteNode(ExecutionTask task)
+        private List<IExecutionTask> ExecuteNode(IExecutionTask task)
         {
             var node = _nodeMap[task.NodeId];
             if (node.Kind == NodeKind.Expression)
-                return new List<ExecutionTask>();
+                return new List<IExecutionTask>();
 
             var instance = GetOrCreateNodeInstance(node.Id);
             InjectContext(instance, task.NodeId);
@@ -104,19 +145,52 @@ namespace JstFlow.Core
                 inputs = new Dictionary<string, object>();
             SetInputs(instance, inputs);
 
-            var nextTasks = new List<ExecutionTask>();
+            var nextTasks = new List<IExecutionTask>();
 
-            // 根据触发类型处理
-            var signal = GetSignal(node.Id, task.TriggerSignal);
-            if (signal != null)
-                nextTasks.AddRange(ExecuteSignal(instance, signal, inputs, task.NodeId));
+            // 使用 switch 语句处理不同的任务类型
+            switch (task)
+            {
+                case ResumeTask resumeTask:
+                    nextTasks.AddRange(ExecuteResume(resumeTask));
+                    break;
+                case SignalTask signalTask:
+                    var signal = GetSignal(node.Id, signalTask.TriggerSignal);
+                    if (signal != null)
+                        nextTasks.AddRange(ExecuteSignal(instance, signal, inputs, task.NodeId));
+                    break;
+            }
 
             return nextTasks;
         }
 
-        private List<ExecutionTask> ExecuteSignal(object instance, SignalInfo signal, Dictionary<string, object> inputs, long nodeId)
+        private List<IExecutionTask> ExecuteResume(ResumeTask resumeTask)
         {
-            var nextTasks = new List<ExecutionTask>();
+            var nextTasks = new List<IExecutionTask>();
+
+            if (_activeEnumerators.TryGetValue(resumeTask.EnumeratorId, out var enumerator))
+            {
+                if (enumerator.MoveNext())
+                {
+                    var nextTask = GetSignalNextTask(resumeTask.NodeId, enumerator.Current);
+                    if (nextTask != null)
+                    {
+                        nextTasks.Add(nextTask);
+                    }
+                    // 继续恢复同一个枚举器
+                    nextTasks.Add(new ResumeTask(resumeTask.NodeId, resumeTask.EnumeratorId));
+                }
+                else
+                {
+                    _activeEnumerators.Remove(resumeTask.EnumeratorId); // 清理
+                }
+            }
+
+            return nextTasks;
+        }
+
+        private List<IExecutionTask> ExecuteSignal(object instance, SignalInfo signal, Dictionary<string, object> inputs, long nodeId)
+        {
+            var nextTasks = new List<IExecutionTask>();
 
             // 根据返回值处理不同情况
             if (signal.MethodInfo.ReturnType == typeof(void))
@@ -141,12 +215,16 @@ namespace JstFlow.Core
                 var enumerator = enumable.GetEnumerator();
                 if (enumerator.MoveNext())
                 {
-                    _activeEnumerators[nodeId] = enumerator;
+                    var genId = Utils.GenId();
+                    _activeEnumerators[genId] = enumerator;
+
                     var nextTask = GetSignalNextTask(nodeId, enumerator.Current);
                     if (nextTask != null)
                     {
                         nextTasks.Add(nextTask);
                     }
+                    // 添加恢复任务
+                    nextTasks.Add(new ResumeTask(nodeId, genId));
                 }
             }
             else if (signal.MethodInfo.ReturnType == typeof(IEnumerator<FlowOutEvent>))
@@ -154,40 +232,22 @@ namespace JstFlow.Core
                 var enumerator = (IEnumerator<FlowOutEvent>)signal.MethodInfo.Invoke(instance, null);
                 if (enumerator.MoveNext())
                 {
-                    _activeEnumerators[nodeId] = enumerator;
+                    var genId = Utils.GenId();
+                    _activeEnumerators[genId] = enumerator;
                     var nextTask = GetSignalNextTask(nodeId, enumerator.Current);
                     if (nextTask != null)
                     {
                         nextTasks.Add(nextTask);
                     }
-                }
-            }
-
-
-            return nextTasks;
-        }
-
-        private List<ExecutionTask> ExecuteEvent(object instance, FlowOutEvent outEvent, Dictionary<string, object> inputs)
-        {
-            var nextTasks = new List<ExecutionTask>();
-
-            if (_activeEnumerators.TryGetValue(CurrentNodeId, out var enumerator))
-            {
-                if (enumerator.MoveNext())
-                {
-                    nextTasks.Add(new ExecutionTask(CurrentNodeId, enumerator.Current));
-                }
-                else
-                {
-                    _activeEnumerators.Remove(CurrentNodeId); // 清理
+                    // 添加恢复任务
+                    nextTasks.Add(new ResumeTask(nodeId, genId));
                 }
             }
 
             return nextTasks;
         }
 
-
-        private ExecutionTask GetSignalNextTask(long nodeId, FlowOutEvent outEvent)
+        private IExecutionTask GetSignalNextTask(long nodeId, FlowOutEvent outEvent)
         {
             if (outEvent == null) return null;
             
@@ -210,11 +270,9 @@ namespace JstFlow.Core
             var targetNodeId = connection.TargetNodeId;
             var signalCode = connection.TargetEndpointCode;
             
-
             // 返回新的执行任务
-            return new ExecutionTask(targetNodeId, signalCode);
+            return new SignalTask(targetNodeId, signalCode);
         }
-
 
         private SignalInfo GetSignal(long nodeId, string triggerSignal)
         {
@@ -291,24 +349,6 @@ namespace JstFlow.Core
             var inst = GetOrCreateNodeInstance(nodeId);
             var field = node.OutputFields.FirstOrDefault(f => f.Label.Code == code);
             return field?.PropertyInfo.GetValue(inst);
-        }
-
-        /// <summary>
-        /// 执行任务类，支持事件和信号两种触发方式
-        /// </summary>
-        public class ExecutionTask
-        {
-            public long NodeId { get; }
-            public string TriggerSignal { get; }
-
-            /// <summary>
-            /// 通过信号触发的构造函数
-            /// </summary>
-            public ExecutionTask(long nodeId, string triggerSignal = null)
-            {
-                NodeId = nodeId;
-                TriggerSignal = triggerSignal;
-            }
         }
     }
 }
