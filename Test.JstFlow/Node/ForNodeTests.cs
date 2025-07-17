@@ -66,15 +66,15 @@ namespace Test.JstFlow.Node
             var events = forNode.StartLoop().ToList();
             
             // Assert
-            // 循环结束后 CurrentIndex 应该是 End + Step
-            Assert.Equal(4, forNode.CurrentIndex);
+            // 循环结束后 CurrentIndex 应该是 End
+            Assert.Equal(3, forNode.CurrentIndex);
             Assert.False(forNode.IsCompleted);
             
         }
 
         [Theory]
-        [InlineData(1, 3, 1, 4)] // 正常循环，结束后 CurrentIndex = End + Step
-        [InlineData(1, 5, 2, 7)] // 步长为2，结束后 CurrentIndex = End + Step
+        [InlineData(1, 3, 1, 3)] // 正常循环，结束后 CurrentIndex = End
+        [InlineData(1, 5, 2, 5)] // 步长为2，结束后 CurrentIndex = End
         [InlineData(5, 1, -1, 5)] // 递减循环，不会执行，CurrentIndex 保持为 Start
         public void ForNode_StartLoop_ShouldSetCorrectCurrentIndex(int start, int end, int step, int expectedFinalIndex)
         {
@@ -107,8 +107,8 @@ namespace Test.JstFlow.Node
             var events = forNode.StartLoop().ToList();
             
             // Assert
-            // 应该有3个循环体事件 + 1个完成事件 = 4个事件
-            Assert.Equal(4, events.Count);
+            // 应该有2个循环体事件 + 1个完成事件 = 3个事件
+            Assert.Equal(3, events.Count);
         }
 
         [Fact]
@@ -197,28 +197,6 @@ namespace Test.JstFlow.Node
         }
 
         [Fact]
-        public void ForNode_StartLoop_ShouldEmitLoopBodyEvents()
-        {
-            // Arrange
-            var forNode = new ForNode
-            {
-                Start = 1,
-                End = 3
-            };
-            
-            // Act
-            var events = forNode.StartLoop().ToList();
-            
-            // Assert
-            // 前3个事件应该是循环体事件
-            for (int i = 0; i < 3; i++)
-            {
-                var loopBodyEvent = events[i];
-                Assert.Equal("LoopBody", loopBodyEvent.MemberName);
-            }
-        }
-
-        [Fact]
         public void ForNode_StartLoop_ShouldEmitLoopCompletedEvent()
         {
             // Arrange
@@ -235,6 +213,28 @@ namespace Test.JstFlow.Node
             // 最后一个事件应该是循环完成事件
             var completedEvent = events.Last();
             Assert.Equal("LoopCompleted", completedEvent.MemberName);
+        }
+
+        [Fact]
+        public void ForNode_StartLoop_ShouldEmitLoopBodyEvents()
+        {
+            // Arrange
+            var forNode = new ForNode
+            {
+                Start = 1,
+                End = 3
+            };
+            
+            // Act
+            var events = forNode.StartLoop().ToList();
+            
+            // Assert
+            // 前2个事件应该是循环体事件
+            for (int i = 0; i < 2; i++)
+            {
+                var loopBodyEvent = events[i];
+                Assert.Equal("LoopBody", loopBodyEvent.MemberName);
+            }
         }
     }
 } 

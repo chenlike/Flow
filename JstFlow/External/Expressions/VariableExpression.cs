@@ -9,7 +9,7 @@ namespace JstFlow.External.Expressions
     [FlowExpr("变量")]
     public class VariableExpression<T> : FlowExpression<T>
     {
-        public VariableExpression(T value)
+        public VariableExpression(T value = default(T))
         {
             Value = value;
         }

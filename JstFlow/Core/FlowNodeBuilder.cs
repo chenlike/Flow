@@ -10,12 +10,57 @@ using JstFlow.Core.Metas;
 using JstFlow.External;
 using JstFlow.External.Nodes;
 using System.Threading.Tasks;
-
+using System.Linq.Expressions;
 
 namespace JstFlow.Core
 {
+    public class FlowNodeBuilderChain<T> where T : FlowBaseNode
+    {
+        private readonly Type _nodeType;
+        private readonly Dictionary<string, object> _initValues;
+
+        internal FlowNodeBuilderChain(Type nodeType)
+        {
+            _nodeType = nodeType;
+            _initValues = new Dictionary<string, object>();
+        }
+
+        public FlowNodeBuilderChain<T> SetValue<TProperty>(Expression<Func<T, TProperty>> propertySelector, TProperty value)
+        {
+            var memberExpression = propertySelector.Body as MemberExpression;
+            if (memberExpression == null)
+            {
+                throw new ArgumentException("表达式必须是属性访问表达式");
+            }
+
+            var propertyName = memberExpression.Member.Name;
+            _initValues[propertyName] = value;
+            return this;
+        }
+
+        public FlowNodeInfo Build()
+        {
+            var res = FlowNodeBuilder.Build(_nodeType, _initValues);
+            if (res.IsFailure)
+            {
+                throw new Exception(res.Message);
+            }
+            return res.Data;
+        }
+    }
+
     public class FlowNodeBuilder
     {
+        /// <summary>
+        /// 链式构建节点
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public static FlowNodeBuilderChain<T> For<T>() where T : FlowBaseNode
+        {
+            return new FlowNodeBuilderChain<T>(typeof(T));
+        }
+
         public static FlowNodeInfo Build<TType>() where TType:FlowBaseNode{
             var res = Build(typeof(TType));
             if(res.IsFailure)
@@ -24,7 +69,7 @@ namespace JstFlow.Core
             }
             return res.Data;
         }
-        public static Res<FlowNodeInfo> Build(Type nodeType)
+        public static Res<FlowNodeInfo> Build(Type nodeType,Dictionary<string,object> initValues = null)
         {
             if (nodeType == null)
                 return Res<FlowNodeInfo>.Fail("节点类型不能为null");
@@ -44,15 +89,15 @@ namespace JstFlow.Core
             if (!result.IsSuccess) return result;
 
             var props = nodeType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            var propResult = ProcessProperties(props, nodeInfo);
+            var propResult = ProcessProperties(props, nodeInfo,initValues);
             if (!propResult.IsSuccess) return propResult;
 
             var methods = nodeType.GetMethods(BindingFlags.Public | BindingFlags.Instance);
             var signalResult = ProcessSignals(methods, nodeInfo);
             if (!signalResult.IsSuccess) return signalResult;
 
-            var events = nodeType.GetEvents(BindingFlags.Public | BindingFlags.Instance);
-            ProcessEmits(events, nodeInfo);
+            // 处理属性类型的emits
+            ProcessPropertyEmits(props, nodeInfo);
 
             return Res<FlowNodeInfo>.Ok(nodeInfo);
         }
@@ -78,20 +123,45 @@ namespace JstFlow.Core
             return Res<FlowNodeInfo>.Ok(nodeInfo);
         }
 
-        private static Res<FlowNodeInfo> ProcessProperties(PropertyInfo[] properties, FlowNodeInfo nodeInfo)
+        private static Res<FlowNodeInfo> ProcessProperties(PropertyInfo[] properties, FlowNodeInfo nodeInfo,Dictionary<string,object> initValues = null)
         {
             foreach (var prop in properties)
             {
                 var inputAttr = prop.GetCustomAttribute<FlowInputAttribute>();
                 if (inputAttr != null)
                 {
-                    nodeInfo.InputFields.Add(new InputField
+                    var field = new InputField
                     {
                         Label = CreateLabel(prop.Name, inputAttr.Label),
                         Type = prop.PropertyType.Name,
                         Required = inputAttr.Required,
-                        PropertyInfo = prop
-                    });
+                        PropertyInfo = prop,
+                    };
+                    
+                    // 传入的初始值优先级最高
+                    if(initValues != null && initValues.ContainsKey(prop.Name))
+                    {
+                        field.InitValue = initValues[prop.Name];
+                    }
+                    else
+                    {
+                        // 如果没有传入初始值，尝试从属性本身获取初始值
+                        try
+                        {
+                            var instance = Activator.CreateInstance(nodeInfo.NodeImplType);
+                            var value = prop.GetValue(instance);
+                            if (value != null && !value.Equals(GetDefaultValue(prop.PropertyType)))
+                            {
+                                field.InitValue = value;
+                            }
+                        }
+                        catch
+                        {
+                            // 如果无法创建实例或获取值失败，忽略错误
+                        }
+                    }
+                    
+                    nodeInfo.InputFields.Add(field);
                 }
 
                 var outputAttr = prop.GetCustomAttribute<FlowOutputAttribute>();
@@ -113,6 +183,11 @@ namespace JstFlow.Core
             }
 
             return Res<FlowNodeInfo>.Ok(nodeInfo);
+        }
+
+        private static object GetDefaultValue(Type type)
+        {
+            return type.IsValueType ? Activator.CreateInstance(type) : null;
         }
 
         private static Res<FlowNodeInfo> ProcessSignals(MethodInfo[] methods, FlowNodeInfo nodeInfo)
@@ -138,17 +213,20 @@ namespace JstFlow.Core
             return Res<FlowNodeInfo>.Ok(nodeInfo);
         }
 
-        private static void ProcessEmits(EventInfo[] events, FlowNodeInfo nodeInfo)
+
+
+        private static void ProcessPropertyEmits(PropertyInfo[] properties, FlowNodeInfo nodeInfo)
         {
-            foreach (var evt in events)
+            // 处理属性类型的emits（FlowEndpoint类型）
+            foreach (var prop in properties)
             {
-                var attr = evt.GetCustomAttribute<FlowEventAttribute>();
-                if (attr != null)
+                var attr = prop.GetCustomAttribute<FlowEventAttribute>();
+                if (attr != null && prop.PropertyType == typeof(FlowEndpoint))
                 {
                     nodeInfo.Emits.Add(new EmitInfo
                     {
-                        Label = CreateLabel(evt.Name, attr.Label),
-                        EventInfo = evt
+                        Label = CreateLabel(prop.Name, attr.Label),
+                        PropertyInfo = prop
                     });
                 }
             }

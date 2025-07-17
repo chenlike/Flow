@@ -245,7 +245,7 @@ namespace JstFlow.Core
                     }
                 }
 
-                // 检查必填输入字段是否都有连接
+                // 检查必填输入字段是否都有连接或有初始值
                 foreach (var node in Nodes)
                 {
                     if (node.InputFields != null)
@@ -258,9 +258,11 @@ namespace JstFlow.Core
                                 c.TargetNodeId == node.Id &&
                                 c.TargetEndpointCode == requiredField.Label.Code);
 
-                            if (!hasConnection)
+                            var hasInitValue = requiredField.InitValue != null;
+
+                            if (!hasConnection && !hasInitValue)
                             {
-                                return Res.Fail($"节点 {node.Id} 的必填输入字段 {requiredField.Label.Code} 没有连接");
+                                return Res.Fail($"节点 {node.NodeImplTypeFullName} {node.Id} 的必填输入字段 {requiredField.Label.Code} 没有连接且没有初始值");
                             }
                         }
                     }

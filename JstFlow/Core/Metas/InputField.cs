@@ -17,6 +17,11 @@ namespace JstFlow.Core.NodeMeta
 
         public PropertyInfo PropertyInfo { get; set; }
 
+        /// <summary>
+        /// 初始化值  如果有连线这个不生效
+        /// </summary>
+        public object InitValue { get; set; }
+
 
     }
 }

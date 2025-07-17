@@ -8,6 +8,7 @@ using JstFlow.External;
 using Xunit;
 using System;
 using System.Reflection;
+using System.Collections.Generic;
 
 namespace Test.JstFlow.Node
 {
@@ -62,6 +63,26 @@ namespace Test.JstFlow.Node
             public string ConflictField { get; set; }
         }
 
+        // 测试用的节点类（有初始值的输入字段）
+        [FlowNode("初始值节点")]
+        private class InitValueNode : FlowBaseNode
+        {
+            [FlowInput("有初始值的字段", Required = true)]
+            public int RequiredFieldWithInitValue { get; set; } = 42;
+
+            [FlowInput("可选字段")]
+            public string OptionalFieldWithInitValue { get; set; } = "默认值";
+
+            [FlowInput("必填字段", Required = true)]
+            public string RequiredFieldWithoutInitValue { get; set; }
+
+            [FlowSignal("测试信号")]
+            public void TestSignal()
+            {
+                // 空实现
+            }
+        }
+
         // 测试用的节点类（无效的信号方法）
         [FlowNode("无效信号节点")]
         private class InvalidSignalNode : FlowBaseNode
@@ -71,6 +92,50 @@ namespace Test.JstFlow.Node
             {
                 return "invalid";
             }
+        }
+
+        // 测试用的节点类（带有FlowEvent属性）
+        [FlowNode("事件节点")]
+        private class EventNode : FlowBaseNode
+        {
+            [FlowInput("输入字段")]
+            public string Input { get; set; }
+
+            [FlowEvent("事件1")]
+            public FlowEndpoint Event1 { get; set; }
+
+            [FlowEvent("事件2")]
+            public FlowEndpoint Event2 { get; set; }
+
+            [FlowSignal("触发事件1")]
+            public FlowOutEvent TriggerEvent1()
+            {
+                return Emit(() => Event1);
+            }
+
+            [FlowSignal("触发事件2")]
+            public FlowOutEvent TriggerEvent2()
+            {
+                return Emit(() => Event2);
+            }
+        }
+
+        // 测试用的节点类（非FlowEndpoint类型的FlowEvent属性）
+        [FlowNode("无效事件节点")]
+        private class InvalidEventNode : FlowBaseNode
+        {
+            [FlowEvent("无效事件")]
+            public string InvalidEvent { get; set; }
+        }
+
+        // 测试用的节点类（没有FlowEvent属性的FlowEndpoint属性）
+        [FlowNode("普通端点节点")]
+        private class NormalEndpointNode : FlowBaseNode
+        {
+            [FlowInput("输入字段")]
+            public string Input { get; set; }
+
+            public FlowEndpoint NormalEndpoint { get; set; }
         }
 
         [Fact]
@@ -303,6 +368,233 @@ namespace Test.JstFlow.Node
             Assert.NotNull(stringListField);
             Assert.Equal("文本列表", stringListField.Label.DisplayName);
             Assert.Equal("List`1", stringListField.Type);
+        }
+
+        [Fact]
+        public void CreateNodeInfo_WithFlowEventProperties_ShouldPopulateEmits()
+        {
+            // Arrange
+            var nodeType = typeof(EventNode);
+
+            // Act
+            var result = FlowNodeBuilder.Build(nodeType);
+
+            // Assert
+            Assert.True(result.IsSuccess);
+            Assert.Equal(2, result.Data.Emits.Count);
+            
+            var event1 = result.Data.Emits.Find(e => e.Label.Code == "Event1");
+            Assert.NotNull(event1);
+            Assert.Equal("事件1", event1.Label.DisplayName);
+            Assert.Equal(typeof(FlowEndpoint), event1.PropertyInfo.PropertyType);
+
+            var event2 = result.Data.Emits.Find(e => e.Label.Code == "Event2");
+            Assert.NotNull(event2);
+            Assert.Equal("事件2", event2.Label.DisplayName);
+            Assert.Equal(typeof(FlowEndpoint), event2.PropertyInfo.PropertyType);
+        }
+
+        [Fact]
+        public void CreateNodeInfo_WithNonFlowEndpointFlowEvent_ShouldNotAddToEmits()
+        {
+            // Arrange
+            var nodeType = typeof(InvalidEventNode);
+
+            // Act
+            var result = FlowNodeBuilder.Build(nodeType);
+
+            // Assert
+            Assert.True(result.IsSuccess);
+            Assert.Equal(0, result.Data.Emits.Count);
+        }
+
+        [Fact]
+        public void CreateNodeInfo_WithNormalFlowEndpoint_ShouldNotAddToEmits()
+        {
+            // Arrange
+            var nodeType = typeof(NormalEndpointNode);
+
+            // Act
+            var result = FlowNodeBuilder.Build(nodeType);
+
+            // Assert
+            Assert.True(result.IsSuccess);
+            Assert.Equal(0, result.Data.Emits.Count);
+        }
+
+        [Fact]
+        public void CreateNodeInfo_WithForNode_ShouldHaveCorrectEmits()
+        {
+            // Arrange
+            var nodeType = typeof(ForNode);
+
+            // Act
+            var result = FlowNodeBuilder.Build(nodeType);
+
+            // Assert
+            Assert.True(result.IsSuccess);
+            Assert.Equal(2, result.Data.Emits.Count);
+            
+            var loopBody = result.Data.Emits.Find(e => e.Label.Code == "LoopBody");
+            Assert.NotNull(loopBody);
+            Assert.Equal("循环体", loopBody.Label.DisplayName);
+            Assert.Equal(typeof(FlowEndpoint), loopBody.PropertyInfo.PropertyType);
+
+            var loopCompleted = result.Data.Emits.Find(e => e.Label.Code == "LoopCompleted");
+            Assert.NotNull(loopCompleted);
+            Assert.Equal("循环完成", loopCompleted.Label.DisplayName);
+            Assert.Equal(typeof(FlowEndpoint), loopCompleted.PropertyInfo.PropertyType);
+        }
+
+        [Fact]
+        public void CreateNodeInfo_WithStartNode_ShouldHaveCorrectEmits()
+        {
+            // Arrange
+            var nodeType = typeof(StartNode);
+
+            // Act
+            var result = FlowNodeBuilder.Build(nodeType);
+
+            // Assert
+            Assert.True(result.IsSuccess);
+            Assert.Equal(1, result.Data.Emits.Count);
+            
+            var startEvent = result.Data.Emits.Find(e => e.Label.Code == "Start");
+            Assert.NotNull(startEvent);
+            Assert.Equal("开始执行", startEvent.Label.DisplayName);
+            Assert.Equal(typeof(FlowEndpoint), startEvent.PropertyInfo.PropertyType);
+        }
+
+        [Fact]
+        public void CreateNodeInfo_WithIfElseNode_ShouldHaveCorrectEmits()
+        {
+            // Arrange
+            var nodeType = typeof(IfElseNode);
+
+            // Act
+            var result = FlowNodeBuilder.Build(nodeType);
+
+            // Assert
+            Assert.True(result.IsSuccess);
+            Assert.Equal(2, result.Data.Emits.Count);
+            
+            var trueBranch = result.Data.Emits.Find(e => e.Label.Code == "TrueBranch");
+            Assert.NotNull(trueBranch);
+            Assert.Equal("真", trueBranch.Label.DisplayName);
+            Assert.Equal(typeof(FlowEndpoint), trueBranch.PropertyInfo.PropertyType);
+
+            var falseBranch = result.Data.Emits.Find(e => e.Label.Code == "FalseBranch");
+            Assert.NotNull(falseBranch);
+            Assert.Equal("假", falseBranch.Label.DisplayName);
+            Assert.Equal(typeof(FlowEndpoint), falseBranch.PropertyInfo.PropertyType);
+        }
+
+        [Fact]
+        public void CreateNodeInfo_WithDebugLogNode_ShouldHaveCorrectEmits()
+        {
+            // Arrange
+            var nodeType = typeof(DebugLogNode);
+
+            // Act
+            var result = FlowNodeBuilder.Build(nodeType);
+
+            // Assert
+            Assert.True(result.IsSuccess);
+            Assert.Equal(1, result.Data.Emits.Count);
+            
+            var nextEvent = result.Data.Emits.Find(e => e.Label.Code == "Next");
+            Assert.NotNull(nextEvent);
+            Assert.Equal("下一步", nextEvent.Label.DisplayName);
+            Assert.Equal(typeof(FlowEndpoint), nextEvent.PropertyInfo.PropertyType);
+        }
+
+        [Fact]
+        public void CreateNodeInfo_WithEmptyEmits_ShouldHaveEmptyEmitsList()
+        {
+            // Arrange
+            var nodeType = typeof(TestNode);
+
+            // Act
+            var result = FlowNodeBuilder.Build(nodeType);
+
+            // Assert
+            Assert.True(result.IsSuccess);
+            Assert.Equal(0, result.Data.Emits.Count);
+        }
+
+        // 测试用的节点类（没有标签的FlowEvent属性）
+        [FlowNode("测试节点")]
+        private class TestNodeWithUnlabeledEvent : FlowBaseNode
+        {
+            [FlowEvent]
+            public FlowEndpoint UnlabeledEvent { get; set; }
+        }
+
+        [Fact]
+        public void CreateNodeInfo_WithFlowEventWithoutLabel_ShouldUsePropertyName()
+        {
+            // Arrange
+            var nodeType = typeof(TestNodeWithUnlabeledEvent);
+
+            // Act
+            var result = FlowNodeBuilder.Build(nodeType);
+
+            // Assert
+            Assert.True(result.IsSuccess);
+            Assert.Equal(1, result.Data.Emits.Count);
+            
+            var emit = result.Data.Emits[0];
+            Assert.Equal("UnlabeledEvent", emit.Label.DisplayName);
+            Assert.Equal("UnlabeledEvent", emit.Label.Code);
+        }
+
+        [Fact]
+        public void CreateNodeInfo_WithInitValue_ShouldSetInitValue()
+        {
+            // Arrange
+            var nodeType = typeof(InitValueNode);
+
+            // Act
+            var result = FlowNodeBuilder.Build(nodeType);
+
+            // Assert
+            Assert.True(result.IsSuccess);
+            
+            var requiredFieldWithInitValue = result.Data.InputFields.Find(f => f.Label.Code == "RequiredFieldWithInitValue");
+            Assert.NotNull(requiredFieldWithInitValue);
+            Assert.True(requiredFieldWithInitValue.Required);
+            Assert.Equal(42, requiredFieldWithInitValue.InitValue);
+
+            var optionalFieldWithInitValue = result.Data.InputFields.Find(f => f.Label.Code == "OptionalFieldWithInitValue");
+            Assert.NotNull(optionalFieldWithInitValue);
+            Assert.False(optionalFieldWithInitValue.Required);
+            Assert.Equal("默认值", optionalFieldWithInitValue.InitValue);
+
+            var requiredFieldWithoutInitValue = result.Data.InputFields.Find(f => f.Label.Code == "RequiredFieldWithoutInitValue");
+            Assert.NotNull(requiredFieldWithoutInitValue);
+            Assert.True(requiredFieldWithoutInitValue.Required);
+            Assert.Null(requiredFieldWithoutInitValue.InitValue);
+        }
+
+        [Fact]
+        public void CreateNodeInfo_WithInitValueAndSetValue_ShouldPrioritizeSetValue()
+        {
+            // Arrange
+            var nodeType = typeof(InitValueNode);
+            var initValues = new Dictionary<string, object>
+            {
+                { "RequiredFieldWithInitValue", 100 }
+            };
+
+            // Act
+            var result = FlowNodeBuilder.Build(nodeType, initValues);
+
+            // Assert
+            Assert.True(result.IsSuccess);
+            
+            var requiredFieldWithInitValue = result.Data.InputFields.Find(f => f.Label.Code == "RequiredFieldWithInitValue");
+            Assert.NotNull(requiredFieldWithInitValue);
+            Assert.Equal(100, requiredFieldWithInitValue.InitValue); // 应该使用 SetValue 的值，而不是属性上的 InitValue
         }
     }
 } 

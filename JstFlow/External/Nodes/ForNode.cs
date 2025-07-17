@@ -42,8 +42,9 @@ namespace JstFlow.External
         {
             // 重置状态
             Reset();
+            
 
-            for (CurrentIndex = Start; CurrentIndex <= End; CurrentIndex += Step)
+            for (CurrentIndex = Start; CurrentIndex < End; CurrentIndex += Step)
             {
                 yield return Emit(()=>LoopBody);
                 if(_isBreak)

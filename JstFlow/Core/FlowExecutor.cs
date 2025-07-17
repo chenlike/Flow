@@ -94,14 +94,14 @@ namespace JstFlow.Core
         {
             var startNode = _graph.Nodes.FirstOrDefault(n => n.Kind == NodeKind.StartNode)
                             ?? throw new InvalidOperationException("流程图没有启动节点");
-            _stack.Push(new SignalTask(startNode.Id, nameof(StartNode.Start)));
+            _stack.Push(new SignalTask(startNode.Id, nameof(StartNode.Execute)));
             return Res.Ok();
         }
 
-        public Res StepNext()
+        public bool StepNext()
         {
             if (_stack.Count == 0)
-                return Res.Fail("没有可执行的节点");
+                return false;
 
             var task = _stack.Pop();
             CurrentNodeId = task.NodeId;
@@ -119,7 +119,7 @@ namespace JstFlow.Core
             // 准备并缓存输出参数
             _outputs[task.NodeId] = SaveOutputs(task.NodeId);
 
-            return Res.Ok();
+            return true;
         }
 
         private IEnumerable<IExecutionTask> Execute(IExecutionTask task)
@@ -220,11 +220,34 @@ namespace JstFlow.Core
 
         private Dictionary<string, object> PrepareInputs(long nodeId)
         {
-            return _graph.Connections
-                .Where(c => c.TargetNodeId == nodeId && c.Type == ConnectionType.OutputToInput)
-                .Select(c => new { c.TargetEndpointCode, Value = GetValue(c) })
-                .Where(x => x.Value != null)
-                .ToDictionary(x => x.TargetEndpointCode, x => x.Value);
+            var defineInputs = _nodes[nodeId].InputFields;
+
+
+            // 获取所有指向当前节点的输入连接
+            var inputConnections = _graph.Connections
+                .Where(c => c.TargetNodeId == nodeId && c.Type == ConnectionType.OutputToInput);
+            var inputs = new Dictionary<string, object>();
+
+            foreach (var input in defineInputs)
+            {
+                var connection = inputConnections.FirstOrDefault(c => c.TargetEndpointCode == input.Label.Code);
+                if (connection != null)
+                {
+                    var value = GetValue(connection);
+                    if (value != null)
+                    {
+                        inputs[connection.TargetEndpointCode] = value;
+                    }
+                }else{
+                    // 查找是否有默认值
+                    if (input.InitValue != null)
+                    {
+                        inputs[input.Label.Code] = input.InitValue;
+                    }
+                }
+            }
+
+            return inputs;
         }
 
         private Dictionary<string, object> SaveOutputs(long nodeId)
