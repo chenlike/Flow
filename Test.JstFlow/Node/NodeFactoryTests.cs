@@ -29,7 +29,7 @@ namespace Test.JstFlow.Node
             [FlowSignal("测试信号")]
             public FlowOutEvent TestSignal()
             {
-                return FlowOutEvent.Of(() => new FlowEndpoint());
+                return Emit(() => new FlowEndpoint());
             }
         }
 
@@ -80,7 +80,7 @@ namespace Test.JstFlow.Node
             var nodeType = typeof(TestNode);
 
             // Act
-            var result = NodeFactory.CreateNodeInfo(nodeType);
+            var result = FlowNodeBuilder.Build(nodeType);
 
             // Assert
             Assert.True(result.IsSuccess);
@@ -99,7 +99,7 @@ namespace Test.JstFlow.Node
             var expressionType = typeof(TestExpression);
 
             // Act
-            var result = NodeFactory.CreateNodeInfo(expressionType);
+            var result = FlowNodeBuilder.Build(expressionType);
 
             // Assert
             Assert.True(result.IsSuccess);
@@ -116,7 +116,7 @@ namespace Test.JstFlow.Node
             var startNodeType = typeof(StartNode);
 
             // Act
-            var result = NodeFactory.CreateNodeInfo(startNodeType);
+            var result = FlowNodeBuilder.Build(startNodeType);
 
             // Assert
             Assert.True(result.IsSuccess);
@@ -128,14 +128,10 @@ namespace Test.JstFlow.Node
         public void CreateNodeInfo_WithInvalidNode_ShouldReturnFailure()
         {
             // Arrange
-            var invalidNodeType = typeof(InvalidNode);
-
-            // Act
-            var result = NodeFactory.CreateNodeInfo(invalidNodeType);
-
+            var result = FlowNodeBuilder.Build(typeof(InvalidNode));
             // Assert
             Assert.False(result.IsSuccess);
-            Assert.Contains("必须继承FlowBaseNode", result.Message);
+            Assert.Contains("类型 InvalidNode 必须继承 FlowBaseNode", result.Message);
         }
 
         [Fact]
@@ -145,7 +141,7 @@ namespace Test.JstFlow.Node
             var nodeType = typeof(TestNode);
 
             // Act
-            var result = NodeFactory.CreateNodeInfo(nodeType);
+            var result = FlowNodeBuilder.Build(nodeType);
 
             // Assert
             Assert.True(result.IsSuccess);
@@ -171,7 +167,7 @@ namespace Test.JstFlow.Node
             var nodeType = typeof(TestNode);
 
             // Act
-            var result = NodeFactory.CreateNodeInfo(nodeType);
+            var result = FlowNodeBuilder.Build(nodeType);
 
             // Assert
             Assert.True(result.IsSuccess);
@@ -190,7 +186,7 @@ namespace Test.JstFlow.Node
             var nodeType = typeof(TestNode);
 
             // Act
-            var result = NodeFactory.CreateNodeInfo(nodeType);
+            var result = FlowNodeBuilder.Build(nodeType);
 
             // Assert
             Assert.True(result.IsSuccess);
@@ -205,28 +201,20 @@ namespace Test.JstFlow.Node
         public void CreateNodeInfo_WithConflictField_ShouldReturnFailure()
         {
             // Arrange
-            var conflictNodeType = typeof(ConflictNode);
-
-            // Act
-            var result = NodeFactory.CreateNodeInfo(conflictNodeType);
-
+            var result = FlowNodeBuilder.Build(typeof(ConflictNode));
             // Assert
             Assert.False(result.IsSuccess);
-            Assert.Contains("同一个属性不能同时作为输入和输出", result.Message);
+            Assert.Contains("属性 ConflictField 不能同时作为输入和输出", result.Message);
         }
 
         [Fact]
         public void CreateNodeInfo_WithInvalidSignal_ShouldReturnFailure()
         {
             // Arrange
-            var invalidSignalNodeType = typeof(InvalidSignalNode);
-
-            // Act
-            var result = NodeFactory.CreateNodeInfo(invalidSignalNodeType);
-
+            var result = FlowNodeBuilder.Build(typeof(InvalidSignalNode));
             // Assert
             Assert.False(result.IsSuccess);
-            Assert.Contains("方法InvalidSignal的返回类型不能是String", result.Message);
+            Assert.Contains("方法 InvalidSignal 的返回类型 String 非法，必须为 void 或 FlowOutEvent ,IEnumable<FlowOutEvent>等有效类型", result.Message);
         }
 
         [Fact]
@@ -236,7 +224,7 @@ namespace Test.JstFlow.Node
             var nodeType = typeof(FlowBaseNode);
 
             // Act
-            var result = NodeFactory.CreateNodeInfo(nodeType);
+            var result = FlowNodeBuilder.Build(nodeType);
 
             // Assert
             Assert.True(result.IsSuccess);
@@ -251,8 +239,8 @@ namespace Test.JstFlow.Node
             var nodeType = typeof(TestNode);
 
             // Act
-            var result1 = NodeFactory.CreateNodeInfo(nodeType);
-            var result2 = NodeFactory.CreateNodeInfo(nodeType);
+            var result1 = FlowNodeBuilder.Build(nodeType);
+            var result2 = FlowNodeBuilder.Build(nodeType);
 
             // Assert
             Assert.True(result1.IsSuccess);
@@ -267,7 +255,7 @@ namespace Test.JstFlow.Node
             Type nullType = null;
 
             // Act
-            var result = NodeFactory.CreateNodeInfo(nullType);
+            var result = FlowNodeBuilder.Build(nullType);
 
             // Assert
             Assert.False(result.IsSuccess);
@@ -281,7 +269,7 @@ namespace Test.JstFlow.Node
             var expressionType = typeof(AddExpression<int>);
 
             // Act
-            var result = NodeFactory.CreateNodeInfo(expressionType);
+            var result = FlowNodeBuilder.Build(expressionType);
 
             // Assert
             Assert.True(result.IsSuccess);
@@ -305,7 +293,7 @@ namespace Test.JstFlow.Node
             var expressionType = typeof(ConcatExpression);
 
             // Act
-            var result = NodeFactory.CreateNodeInfo(expressionType);
+            var result = FlowNodeBuilder.Build(expressionType);
 
             // Assert
             Assert.True(result.IsSuccess);

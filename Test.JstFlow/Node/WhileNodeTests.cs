@@ -5,6 +5,8 @@ using JstFlow.External.Nodes;
 using Xunit;
 using System;
 using System.Reflection;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace Test.JstFlow.Node
 {
@@ -33,7 +35,7 @@ namespace Test.JstFlow.Node
         }
 
         [Fact]
-        public void WhileNode_StartLoop_ShouldReturnFlowOutEvent()
+        public void WhileNode_StartLoop_ShouldReturnIEnumerableFlowOutEvent()
         {
             // Arrange
             var whileNode = new WhileNode
@@ -48,7 +50,7 @@ namespace Test.JstFlow.Node
             
             // Assert
             Assert.NotNull(result);
-            Assert.IsType<FlowOutEvent>(result);
+            Assert.IsAssignableFrom<IEnumerable<FlowOutEvent>>(result);
         }
 
         [Fact]
@@ -63,11 +65,16 @@ namespace Test.JstFlow.Node
             whileNode.Inject(context);
             
             // Act
-            var result = whileNode.StartLoop();
+            var events = whileNode.StartLoop().ToList();
             
             // Assert
-            Assert.NotNull(result.Expression);
-            var compiledExpression = result.Expression.Compile();
+            Assert.NotNull(events);
+            Assert.NotEmpty(events);
+            
+            // 最后一个事件应该是循环完成事件
+            var lastEvent = events.Last();
+            Assert.NotNull(lastEvent.Expression);
+            var compiledExpression = lastEvent.Expression.Compile();
             Assert.Equal(whileNode.LoopCompleted, compiledExpression());
         }
 
@@ -85,7 +92,7 @@ namespace Test.JstFlow.Node
             whileNode.Inject(context);
             
             // Act
-            whileNode.StartLoop();
+            var events = whileNode.StartLoop().ToList();
             
             // Assert
             Assert.Equal(expectedIterations, whileNode.CurrentIteration);
@@ -104,10 +111,79 @@ namespace Test.JstFlow.Node
             whileNode.Inject(context);
             
             // Act
-            whileNode.StartLoop();
+            var events = whileNode.StartLoop().ToList();
             
             // Assert
             Assert.Equal(5, whileNode.CurrentIteration);
+        }
+
+        [Fact]
+        public void WhileNode_StartLoop_ShouldReturnCorrectNumberOfEvents()
+        {
+            // Arrange
+            var whileNode = new WhileNode
+            {
+                Condition = true,
+                MaxIterations = 3
+            };
+            var context = new NodeContext();
+            whileNode.Inject(context);
+            
+            // Act
+            var events = whileNode.StartLoop().ToList();
+            
+            // Assert
+            // 应该有3个循环体事件 + 1个完成事件 = 4个事件
+            Assert.Equal(4, events.Count);
+        }
+
+        [Fact]
+        public void WhileNode_StartLoop_ShouldEmitLoopBodyEvents()
+        {
+            // Arrange
+            var whileNode = new WhileNode
+            {
+                Condition = true,
+                MaxIterations = 3
+            };
+            var context = new NodeContext();
+            whileNode.Inject(context);
+            
+            // Act
+            var events = whileNode.StartLoop().ToList();
+            
+            // Assert
+            // 前3个事件应该是循环体事件
+            for (int i = 0; i < 3; i++)
+            {
+                var loopBodyEvent = events[i];
+                Assert.NotNull(loopBodyEvent.Expression);
+                var compiledExpression = loopBodyEvent.Expression.Compile();
+                Assert.Equal(whileNode.LoopBody, compiledExpression());
+            }
+        }
+
+        [Fact]
+        public void WhileNode_StartLoop_ShouldEmitLoopCompletedEvent()
+        {
+            // Arrange
+            var whileNode = new WhileNode
+            {
+                Condition = true,
+                MaxIterations = 3
+            };
+            var context = new NodeContext();
+            whileNode.Inject(context);
+            
+            // Act
+            var events = whileNode.StartLoop().ToList();
+            
+            // Assert
+            // 最后一个事件应该是循环完成事件
+            var completedEvent = events.Last();
+            Assert.NotNull(completedEvent.Expression);
+            var compiledExpression = completedEvent.Expression.Compile();
+            Assert.Equal(whileNode.LoopCompleted, compiledExpression());
         }
 
         [Fact]
@@ -142,7 +218,7 @@ namespace Test.JstFlow.Node
             
             // Act
             whileNode.Break();
-            whileNode.StartLoop();
+            var events = whileNode.StartLoop().ToList();
             
             // Assert
             Assert.Equal(10, whileNode.CurrentIteration); // 会一直循环到最大迭代次数
@@ -196,11 +272,34 @@ namespace Test.JstFlow.Node
             whileNode.Inject(context);
             
             // Act
-            whileNode.StartLoop();
+            var events = whileNode.StartLoop().ToList();
             
             // Assert
             // 循环应该正常完成，没有被中断
             Assert.Equal(3, whileNode.CurrentIteration);
+        }
+
+        [Fact]
+        public void WhileNode_StartLoop_WithFalseCondition_ShouldReturnOnlyCompletedEvent()
+        {
+            // Arrange
+            var whileNode = new WhileNode
+            {
+                Condition = false
+            };
+            var context = new NodeContext();
+            whileNode.Inject(context);
+            
+            // Act
+            var events = whileNode.StartLoop().ToList();
+            
+            // Assert
+            // 条件为假时，应该只有一个完成事件
+            Assert.Single(events);
+            var completedEvent = events.First();
+            Assert.NotNull(completedEvent.Expression);
+            var compiledExpression = completedEvent.Expression.Compile();
+            Assert.Equal(whileNode.LoopCompleted, compiledExpression());
         }
     }
 } 

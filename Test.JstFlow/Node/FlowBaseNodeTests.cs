@@ -14,14 +14,9 @@ namespace Test.JstFlow.Node
         {
             public FlowEndpoint TestEndpoint { get; set; }
             
-            public FlowOutEvent TestMoveNext()
+            public FlowOutEvent TestEmit()
             {
-                return MoveNext(() => TestEndpoint);
-            }
-            
-            public void TestExecute()
-            {
-                Execute(() => TestEndpoint);
+                return Emit(() => TestEndpoint);
             }
         }
 
@@ -39,7 +34,7 @@ namespace Test.JstFlow.Node
         }
 
         [Fact]
-        public void FlowBaseNode_MoveNext_ShouldReturnFlowOutEvent()
+        public void FlowBaseNode_Emit_ShouldReturnFlowOutEvent()
         {
             // Arrange
             var node = new TestFlowNode();
@@ -47,7 +42,7 @@ namespace Test.JstFlow.Node
             node.Inject(context);
             
             // Act
-            var result = node.TestMoveNext();
+            var result = node.TestEmit();
             
             // Assert
             Assert.NotNull(result);
@@ -55,7 +50,7 @@ namespace Test.JstFlow.Node
         }
 
         [Fact]
-        public void FlowBaseNode_MoveNext_ShouldReturnCorrectExpression()
+        public void FlowBaseNode_Emit_ShouldReturnCorrectExpression()
         {
             // Arrange
             var node = new TestFlowNode();
@@ -65,7 +60,7 @@ namespace Test.JstFlow.Node
             node.TestEndpoint = expectedEndpoint;
             
             // Act
-            var result = node.TestMoveNext();
+            var result = node.TestEmit();
             
             // Assert
             Assert.NotNull(result.Expression);
@@ -114,20 +109,6 @@ namespace Test.JstFlow.Node
             
             // Assert
             Assert.Null(result);
-        }
-
-        [Fact]
-        public void FlowBaseNode_Execute_ShouldNotThrowException()
-        {
-            // Arrange
-            var node = new TestFlowNode();
-            var context = new NodeContext();
-            node.Inject(context);
-            
-            // Act & Assert
-            // Execute方法应该不会抛出异常，即使TriggerFlowEvent目前是空实现
-            var exception = Record.Exception(() => node.TestExecute());
-            Assert.Null(exception);
         }
     }
 } 

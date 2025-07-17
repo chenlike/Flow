@@ -73,7 +73,7 @@ namespace Test.JstFlow.Node
             var startNode = new StartNode();
             
             // Act
-            var methodInfo = typeof(StartNode).GetMethod("StartLoop");
+            var methodInfo = typeof(StartNode).GetMethod("Execute");
             var signalAttribute = methodInfo.GetCustomAttributes(typeof(FlowSignalAttribute), false);
             
             // Assert

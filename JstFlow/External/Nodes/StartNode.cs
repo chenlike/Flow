@@ -18,7 +18,7 @@ namespace JstFlow.External
         [FlowSignal("开始循环")]
         public FlowOutEvent Execute()
         {
-            return MoveNext(()=>Start);
+            return Emit(()=>Start);
         }
     }
 }
